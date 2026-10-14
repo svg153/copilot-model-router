@@ -31,6 +31,32 @@ const SOURCE_URLS = {
     jeinlee: JEINLEE_BASE,
 };
 
+// Provenance travels with the generated file: whoever copies only the JSON still
+// gets the origin, the licence and what exactly was taken from each source.
+const SOURCE_LICENSES = {
+    modelsDev: {
+        name: "models.dev",
+        repository: "https://github.com/anomalyco/models.dev",
+        license: "MIT",
+        licenseUrl: "https://github.com/anomalyco/models.dev/blob/main/LICENSE",
+        taken: "Vendor names, per-million-token prices, context size and capability flags.",
+    },
+    showdown: {
+        name: "showdown",
+        repository: "https://github.com/verseles/showdown",
+        license: "AGPL-3.0",
+        licenseUrl: "https://github.com/verseles/showdown/blob/main/LICENSE",
+        taken: "Numeric throughput and time-to-first-token measurements only. No code, no text.",
+    },
+    jeinlee: {
+        name: "chinese-llm-benchmark",
+        repository: "https://github.com/jeinlee1991/chinese-llm-benchmark",
+        license: "No licence declared",
+        licenseUrl: "https://github.com/jeinlee1991/chinese-llm-benchmark",
+        taken: "Numeric benchmark scores only. No code, no text, no table layout.",
+    },
+};
+
 const log = (...args) => console.log(...args);
 
 // The benchmark repo publishes one markdown table per capability. `reasonmodel`
@@ -557,6 +583,14 @@ async function main() {
             schema: 1,
             generatedAt: new Date().toISOString(),
             sources: Object.entries(SOURCE_URLS).map(([id, url]) => ({ id, url })),
+            licenses: Object.fromEntries(
+                Object.entries(SOURCE_LICENSES).map(([id, info]) => [id, { ...info, url: SOURCE_URLS[id] }]),
+            ),
+            notice:
+                "Numeric facts only, reproduced with attribution. No source code, prose, table layout or " +
+                "creative arrangement is copied, and no upstream file is redistributed. Each source keeps " +
+                "all of its rights; see meta.licenses. This file is a derived compilation with its own " +
+                "structure, built by scripts/build-data.mjs.",
             tables: results.benchmarks.fetched,
             counts,
         },

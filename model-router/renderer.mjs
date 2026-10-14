@@ -340,11 +340,14 @@ const BODY = `
     <p class="sub">
       Arrastra para girar, usa la rueda para acercarte y pasa el ratón por encima de una esfera para ver el modelo.
       Es la misma información que la pestaña Comparativa, pero vista como un terreno: se entiende de un vistazo
-      dónde está la frontera buena y barata.
+      dónde está la frontera buena y barata. Arranca mostrando solo los modelos que puedes elegir, igual que la tabla.
     </p>
     <div class="bar-top" style="margin-bottom:10px">
       <button id="sceneReset">Reencuadrar</button>
       <button id="sceneSpin" aria-pressed="false">Girar solo</button>
+      <button id="sceneMine" class="toggle" aria-pressed="true">Solo mis modelos</button>
+      <button id="sceneEstimated" class="toggle" aria-pressed="true">Con estimadas (~)</button>
+      <button id="sceneUnpriced" class="toggle" aria-pressed="true">Con esferas sin precio</button>
       <span id="sceneStatus" class="status"></span>
     </div>
     <div class="scene" id="scene3d"><div class="tip" id="sceneTip"></div></div>
@@ -367,6 +370,16 @@ const BODY = `
       <dd>Nota global: cuanto más grande, mejor.</dd>
       <dt>Color</dt>
       <dd>Fabricante. Las esferas con halo son los modelos que tienes disponibles ahora mismo.</dd>
+      <dt>Filtros del mapa</dt>
+      <dd>
+        <b>Solo mis modelos</b> arranca activado y deja en pantalla únicamente los modelos que puedes elegir, igual que
+        la tabla de la pestaña Comparativa; al quitarlo aparece todo el campo público para comparar. <b>Con estimadas (~)</b>
+        muestra u oculta las esferas cuya nota se dedujo de otras variantes de su familia en vez de medirse directamente.
+        <b>Con esferas sin precio</b> muestra u oculta el carril de la derecha. Los botones de color de la leyenda
+        filtran por fabricante: el primero que pulsas aísla ese fabricante y el botón <b>Todos los fabricantes</b> lo deshace.
+        El filtro de proveedor y modelos de la pestaña Enrutado se aplica encima, pero no borra esferas: atenúa las que
+        quedan fuera, para que el terreno siga siendo comparable.
+      </dd>
       <dt>Esferas huecas</dt>
       <dd>
         Modelos que el benchmark público midió pero para los que no hay precio público. No pueden colocarse
@@ -461,9 +474,14 @@ var benchSort = { key: "total", dir: -1 };
 // use. "picked" is keyed by the snapshot's normalised id and null means "all".
 var filters = { provider: "all", picked: null };
 // The leaderboard carries every model the public benchmark scored, most of
-// which you cannot pick. The table opens on your own models; the toggle widens
-// it to the full field for context.
-var benchOnlyMine = true;
+// which you cannot pick. The table and the 3D map open on your own models; the
+// toggle widens both to the full field for context.
+var onlyMine = true;
+
+// 3D-only filters, so the map can be narrowed without touching the tables.
+var sceneVendors = null;      // null = every vendor; otherwise a set of names
+var sceneShowUnpriced = true; // hollow spheres sitting in the side lane
+var sceneShowEstimated = true; // rows whose note was inferred from the family
 
 var SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -755,7 +773,10 @@ function togglePick(key) {
 
 function clearFilters() {
   filters = { provider: "all", picked: null };
-  benchOnlyMine = true;
+  onlyMine = true;
+  sceneVendors = null;
+  sceneShowUnpriced = true;
+  sceneShowEstimated = true;
   renderFiltered();
 }
 
@@ -825,8 +846,8 @@ function renderFilterBar() {
     className: "toggle", type: "button", textContent: "Ninguno",
     onclick: function () { filters.picked = {}; renderFiltered(); }
   }));
-  actions.append(toggleButton("Solo mis modelos en la tabla", benchOnlyMine, function () {
-    benchOnlyMine = !benchOnlyMine;
+  actions.append(toggleButton("Solo mis modelos", onlyMine, function () {
+    onlyMine = !onlyMine;
     renderFiltered();
   }));
   actions.append(el("button", {
@@ -853,6 +874,9 @@ function renderFilterNote() {
   parts.push("Las notas salen del ranking público; si tu modelo no está medido directamente, " +
     "se estima a partir de variantes de su familia y se marca con ~. Un modelo sin ninguna " +
     "referencia se evalúa solo por precio y velocidad, y la tarjeta lo avisa.");
+  parts.push(onlyMine
+    ? "La tabla y el mapa 3D muestran solo los modelos que puedes elegir; quita el boton Solo mis modelos para ver todo el campo publico."
+    : "La tabla y el mapa 3D muestran todo el campo publico; las filas y esferas resaltadas son los modelos que tienes.");
   document.getElementById("filterNote").textContent = parts.join(" ");
 }
 
@@ -1548,7 +1572,7 @@ function renderBenchTable() {
   var limit = activeKeySet();
   var scored = scoredRows();
   var rows = scored.filter(function (row) {
-    if (benchOnlyMine && !mine[row.id]) return false;
+    if (onlyMine && !mine[row.id]) return false;
     if (limit && !limit[row.id]) return false;
     return true;
   }).sort(function (a, b) {
@@ -1595,7 +1619,7 @@ function renderBenchTable() {
     body.append(el("tr", { className: "empty-row" }, [
       el("td", {
         colSpan: columns.length,
-        textContent: benchOnlyMine
+        textContent: onlyMine
           ? "Ninguno de los modelos que puedes elegir tiene notas públicas ni una estimación por familia. Desactiva el botón de arriba para ver los " + scored.length + " modelos que sí están medidos, aunque no puedas escogerlos."
           : "Ninguno de los modelos filtrados tiene notas de benchmarks públicos todavía."
       })
@@ -1604,9 +1628,9 @@ function renderBenchTable() {
   table.append(body);
 
   var sub = rows.length + " de " + scored.length + " modelos con notas" +
-    (benchOnlyMine ? " · solo los que puedes elegir" : " · todo el campo público") +
+    (onlyMine ? " · solo los que puedes elegir" : " · todo el campo público") +
     (limit ? " · filtrados" : "") + ".";
-  if (!benchOnlyMine) sub += " Las filas resaltadas son modelos que tienes disponibles.";
+  if (!onlyMine) sub += " Las filas resaltadas son modelos que tienes disponibles.";
   if (estimatedShown) sub += " Los marcados con ~ son estimaciones por familia, no medidas directas.";
   document.getElementById("benchSub").textContent = sub;
 }
@@ -1645,18 +1669,29 @@ function currentSceneSignature() {
   if (filters.picked) {
     picked = Object.keys(filters.picked).filter(function (key) { return filters.picked[key]; }).sort().join(",");
   }
-  return filters.provider + "|" + picked + "|" + benchRows.length + "|" + allModels().length;
+  var vendors = "all";
+  if (sceneVendors) vendors = Object.keys(sceneVendors).sort().join(",");
+  return filters.provider + "|" + picked + "|" + vendors + "|" +
+    (onlyMine ? "mine" : "all") + "|" +
+    (sceneShowUnpriced ? "px" : "nopx") + "|" +
+    (sceneShowEstimated ? "est" : "noest") + "|" +
+    benchRows.length + "|" + allModels().length;
 }
 
 /**
- * Every scored row is always plotted, so the landscape and the reference
- * frame stay comparable. The filter only decides which ones get a ring and
- * which ones fade into the background.
+ * Plots the scored rows that survive the scope and the 3D filters. The
+ * provider/model filter does not remove anything here: it only decides which
+ * spheres get a ring and which ones fade, so the landscape stays comparable.
  */
 function scenePoints() {
   var limit = activeKeySet();
   return scoredRows().filter(function (row) {
-    return row.bench && typeof row.bench.total === "number";
+    if (!row.bench || typeof row.bench.total !== "number") return false;
+    if (onlyMine && !isMine(row.id)) return false;
+    if (!sceneShowEstimated && row.estimated) return false;
+    if (!sceneShowUnpriced && typeof row.blendedCost !== "number") return false;
+    if (sceneVendors && !sceneVendors[row.vendor || VENDOR_FALLBACK]) return false;
+    return true;
   }).map(function (row) {
     var active = !limit || limit[row.id] === true;
     return {
@@ -1678,7 +1713,13 @@ function buildScene(THREE) {
   var tip = document.getElementById("sceneTip");
   var points = scenePoints();
   if (!points.length) {
-    host.append(el("p", { className: "small muted", style: { padding: "16px" }, textContent: "No hay datos de benchmark para dibujar." }));
+    host.append(el("p", {
+      className: "small muted",
+      style: { padding: "16px" },
+      textContent: onlyMine
+        ? "Ninguno de los modelos que puedes elegir tiene nota global ni una estimación por familia. Quita el botón Solo mis modelos para ver todo el campo público."
+        : "Ninguna esfera pasa los filtros del mapa 3D. Prueba a activar las esferas sin precio, las estimadas o a soltar el filtro de fabricante."
+    }));
     return null;
   }
 
@@ -2004,8 +2045,11 @@ function buildScene(THREE) {
   var dimmed = points.filter(function (point) { return point.dim; }).length;
   var status = document.getElementById("sceneStatus");
   if (status) {
-    status.textContent = points.length + " esferas · " + highlighted + " con halo (tus modelos)" +
-      (dimmed ? " · " + dimmed + " atenuadas por el filtro" : "") +
+    status.textContent = points.length + " esferas" +
+      (onlyMine ? " (solo las que puedes elegir)" : " (todo el campo público)") +
+      " · " + highlighted + " con halo" +
+      (dimmed ? " · " + dimmed + " atenuadas por el filtro de arriba" : "") +
+      (sceneVendors ? " · " + Object.keys(sceneVendors).length + " fabricante(s)" : "") +
       (unpricedCount ? " · " + unpricedCount + " sin precio público (huecas, en su carril)" : "");
   }
 
@@ -2063,14 +2107,53 @@ function clearSceneMessages() {
   document.querySelectorAll("#scene3d .scene-message").forEach(function (node) { node.remove(); });
 }
 
+function toggleSceneVendor(vendor) {
+  var next = {};
+  if (sceneVendors) {
+    Object.keys(sceneVendors).forEach(function (key) { if (sceneVendors[key]) next[key] = true; });
+  } else {
+    // Seed with what is on screen, so the first click isolates one vendor
+    // instead of narrowing the map down to that vendor alone.
+    scenePoints().forEach(function (point) { next[point.vendor] = true; });
+  }
+  if (next[vendor]) delete next[vendor]; else next[vendor] = true;
+  sceneVendors = Object.keys(next).length ? next : null;
+  renderFiltered();
+}
+
+function syncSceneButtons() {
+  [
+    ["sceneMine", onlyMine],
+    ["sceneUnpriced", sceneShowUnpriced],
+    ["sceneEstimated", sceneShowEstimated]
+  ].forEach(function (pair) {
+    var node = document.getElementById(pair[0]);
+    if (node) node.setAttribute("aria-pressed", pair[1] ? "true" : "false");
+  });
+}
+
 function renderSceneLegend() {
   var legend = clear("sceneLegend");
   var vendors = {};
   var points = scenePoints();
   points.forEach(function (point) { vendors[point.vendor] = true; });
-  Object.keys(vendors).sort().forEach(function (vendor) {
-    legend.append(el("span", null, [
-      el("span", { className: "dot", style: { background: vendorColor(vendor) } }),
+  var names = Object.keys(vendors).sort();
+  if (sceneVendors) {
+    legend.append(el("button", {
+      className: "toggle", type: "button", textContent: "Todos los fabricantes",
+      onclick: function () { sceneVendors = null; renderFiltered(); }
+    }));
+  }
+  names.forEach(function (vendor) {
+    var on = !sceneVendors || sceneVendors[vendor] === true;
+    legend.append(el("button", {
+      className: "toggle",
+      type: "button",
+      attrs: { "aria-pressed": on ? "true" : "false" },
+      title: "Mostrar u ocultar " + vendor,
+      onclick: function () { toggleSceneVendor(vendor); }
+    }, [
+      el("span", { className: "swatch", style: { background: vendorColor(vendor) } }),
       el("span", { textContent: " " + vendor })
     ]));
   });
@@ -2078,8 +2161,8 @@ function renderSceneLegend() {
   var unpriced = points.filter(function (point) { return point.cost === null; }).length;
   legend.append(el("span", {
     className: "tiny",
-    textContent: highlighted + " modelos resaltados con halo" +
-      (filterActive() ? " (" + activeModels().length + " pasan el filtro actual)" : "")
+    textContent: points.length + " esferas en pantalla · " + highlighted + " resaltadas con halo" +
+      (filterActive() ? " (" + activeModels().length + " pasan el filtro de arriba)" : "")
   }));
   if (unpriced) {
     legend.append(el("span", {
@@ -2087,6 +2170,7 @@ function renderSceneLegend() {
       textContent: unpriced + " esferas huecas: sin precio público, fuera del eje X"
     }));
   }
+  syncSceneButtons();
   renderAxisKey();
 }
 
@@ -2120,6 +2204,20 @@ function wireSceneButtons() {
       if (sceneSetSpin) sceneSetSpin(on);
     });
   }
+  [
+    ["sceneMine", function (on) { onlyMine = on; }],
+    ["sceneEstimated", function (on) { sceneShowEstimated = on; }],
+    ["sceneUnpriced", function (on) { sceneShowUnpriced = on; }]
+  ].forEach(function (pair) {
+    var node = document.getElementById(pair[0]);
+    if (!node) return;
+    node.addEventListener("click", function () {
+      var on = node.getAttribute("aria-pressed") !== "true";
+      pair[1](on);
+      node.setAttribute("aria-pressed", on ? "true" : "false");
+      renderFiltered();
+    });
+  });
 }
 
 // --- guide tab --------------------------------------------------------------
@@ -2138,7 +2236,8 @@ function renderGuide() {
     ["Instantánea de datos", "Un fichero JSON con fabricantes, precios, notas de benchmark y velocidades, generado desde fuentes públicas y actualizado periódicamente por el propio repositorio."],
     ["Filtro por proveedor", "Reduce todo lo que ves a los modelos de un solo proveedor. Al elegir tu proveedor externo, las seis recomendaciones y los subagentes se recalculan usando solo esos modelos: sirve para comprobar qué conviene dentro de lo que ya pagas."],
     ["Selección de modelos", "Puedes quitar modelos concretos de la comparación con un clic. El primer clic deja seleccionados todos y desmarca el que pulsaste, así que se quita de uno en uno. Mientras haya selección manual, todo se calcula con los que queden."],
-    ["Solo mis modelos en la tabla", "La tabla arranca mostrando solo las filas que coinciden con tu catálogo, para no perder de vista los tuyos entre los demás. Al desactivarlo aparecen los 88 modelos del ranking público, útiles como referencia aunque no puedas escogerlos."],
+    ["Solo mis modelos", "La tabla de la pestaña Comparativa y el mapa 3D arrancan mostrando solo lo que coincide con tu catálogo, para no perder de vista los tuyos entre los demás. Al desactivarlo aparecen los 88 modelos del ranking público, útiles como referencia aunque no puedas escogerlos."],
+    ["Filtros del mapa 3D", "Además de la selección de arriba, el mapa tiene sus propios interruptores: quitar Solo mis modelos, ocultar las notas estimadas, ocultar el carril de las esferas sin precio, y aislar un fabricante pulsando su color en la leyenda."],
     ["Notas estimadas (~)", "Si el benchmark no midió tu modelo exacto pero sí variantes de su familia, la nota es la mediana de esas variantes y va marcada con una tilde. Nunca se presenta como una medida directa."]
   ]);
 }

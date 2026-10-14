@@ -11,7 +11,7 @@ premium por culpa de `Auto`.
 | Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
 | Pestaña **Comparativa** | Ranking de benchmarks públicos, gráfico calidad/precio, una recomendación por tipo de subagente y **filtros por proveedor y por modelo**. |
-| Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos (calidad, precio y velocidad) con marco de referencia, rejilla y etiquetas de eje. Solo se carga al abrir la pestaña. |
+| Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos (calidad, precio y velocidad) con marco de referencia, rejilla y etiquetas de eje. Arranca solo con los modelos que puedes elegir y tiene filtros propios por estimadas, sin precio y fabricante. Solo se carga al abrir la pestaña. |
 | Workflow `plan-then-execute` | Un modelo caro planifica, modelos baratos ejecutan en paralelo, un tercer modelo verifica. |
 | Ajustes de subagentes | Se aplican a la sesión viva vía `session.rpc.tools.updateSubagentSettings`. |
 | Bloque de política | Al iniciar sesión se inyecta `<model-routing-policy>` para que el agente enrute a propósito. |
@@ -149,6 +149,35 @@ El script que hace el cruce (`scripts/build-data.mjs`) deja constancia de las tr
 `meta.sources` de la instantánea, y la pestaña **Guía** del panel las muestra con enlace
 directo.
 
+#### Base legal de la reutilización
+
+Esta instantánea es una **recopilación derivada con estructura propia**, no una copia de
+ningún proyecto. En concreto:
+
+- **Solo se extraen hechos numéricos** (precios, tamaños de contexto, puntuaciones,
+  velocidades). Los datos y las cifras no son objeto de derechos de autor.
+- **No se copia código, ni texto, ni el diseño de las tablas, ni el criterio de selección
+  y ordenación** de ninguna fuente. Esos elementos —los únicos que sí son protegibles— se
+  quedan fuera.
+- **No se redistribuye ningún fichero original.** Se descargan en tiempo de compilación y
+  se descartan; lo que se publica son valores sueltos reorganizados.
+- **Cada fuente conserva todos sus derechos**, con atribución visible en la tabla de
+  arriba, en la pestaña Guía y dentro del propio JSON.
+
+La procedencia **viaja con los datos**: `meta.licenses` guarda, por cada origen, el
+repositorio, la licencia, el enlace y **qué se tomó exactamente**; `meta.notice` resume la
+base anterior. Así, aunque alguien copie solo el fichero `.json`, la licencia y el origen
+van con él.
+
+**Retirada inmediata.** Si alguna fuente pide que se dejen de usar sus datos, basta con
+borrar su entrada de `SOURCE_URLS` en `scripts/build-data.mjs`, volver a ejecutar el script
+y los valores desaparecen de la instantánea; el panel sigue funcionando con el resto. Es un
+cambio de una línea.
+
+> Nada de esto es asesoramiento jurídico: es la justificación de por qué este proyecto usa
+> datos públicos de la forma en que lo hace. Si el panel se fuese a explotar
+> comercialmente, conviene una revisión profesional.
+
 #### La tilde `~` en las notas
 
 Cuando el benchmark no midió **ese** modelo exacto pero sí variantes de su misma familia,
@@ -203,8 +232,8 @@ recomendación, al gráfico, a la tabla y a la leyenda del 3D:
 | **Proveedor** | Deja solo los modelos de ese proveedor. Sirve para responder a la pregunta *"con lo que ya pago, ¿qué me conviene para cada tarea?"*. |
 | **Modelos** | Al pulsar un modelo se quita de la lista; el primer clic siembra la selección con todo lo visible, así que **desmarcas lo que no quieres** en lugar de quedarte con uno solo. |
 | **Ninguno** | Vacía la selección y las tarjetas quedan sin recomendación. |
-| **Solo mis modelos en la tabla** | **Activado por defecto.** La tabla arranca con las filas que coinciden con tu catálogo, para no perder de vista los tuyos entre los 88 del ranking público. Al desactivarlo aparecen todos, como referencia. |
-| **Quitar filtros** | Vuelve a los 37 modelos del catálogo y reactiva *Solo mis modelos en la tabla*. |
+| **Solo mis modelos** | **Activado por defecto.** Afecta a la **tabla y al mapa 3D**: ambos arrancan mostrando solo los modelos que coinciden con tu catálogo, para no perder de vista los tuyos entre los 88 del ranking público. Al desactivarlo aparecen todos, como referencia. |
+| **Quitar filtros** | Vuelve a los 37 modelos del catálogo y reactiva *Solo mis modelos* y los tres filtros del mapa 3D. |
 
 Cuando hay un filtro activo aparece un aviso sobre el panel de enrutado, para que no se
 confunda una recomendación filtrada con la recomendación global. Las notas de calidad se
@@ -216,7 +245,21 @@ modelos compiten, no la escala.
 Cada modelo medido es una esfera: **X** es el precio en escala logarítmica, **Y** la nota
 global y **Z** la velocidad en tokens por segundo. El color es el fabricante, el tamaño
 la nota global, y las esferas con **halo** son los modelos que tienes disponibles ahora
-mismo. Los que quedan fuera del filtro se atenúan.
+mismo. Los que quedan fuera del filtro de arriba se atenúan.
+
+El mapa **arranca mostrando solo los modelos que puedes elegir**, igual que la tabla: son
+23 esferas de las 87 posibles. Si quieres ver el campo público completo, desactiva
+**Solo mis modelos**. Además tiene tres filtros propios:
+
+| Control | Efecto |
+| --- | --- |
+| **Solo mis modelos** | El mismo interruptor que en la tabla. Activado, el mapa se limita a los modelos de tu catálogo. |
+| **Con estimadas (~)** | Incluye o excluye las esferas cuya nota es una estimación por familia, no una medida directa. |
+| **Con esferas sin precio** | Incluye o excluye las esferas huecas del carril sin precio. |
+| **Fabricante (leyenda)** | Cada color de la leyenda es un botón. El primer clic aísla ese fabricante —deja los demás fuera— y el botón **Todos los fabricantes** que aparece entonces lo deshace. |
+
+La línea de estado resume qué estás viendo: cuántas esferas hay, cuántas llevan halo,
+cuántas quedan atenuadas por el filtro de arriba y cuántas están en el carril sin precio.
 
 Para que girar la escena no te deje sin referencias, el mapa lleva un **marco de
 referencia** fijo: una caja que envuelve los datos, una rejilla en el suelo, tres flechas
