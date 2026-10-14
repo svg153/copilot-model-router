@@ -16,6 +16,7 @@ import {
     BUILTIN_SUBAGENT_TYPES,
     DEFAULT_PROVIDER_LABELS,
     EFFORT_LEVELS,
+    MODEL_POLICIES,
     buildFallbackCatalog,
     loadRouting,
     normalizeCatalog,
@@ -184,6 +185,7 @@ async function startServer(session) {
                     catalog,
                     effortLevels: EFFORT_LEVELS,
                     subagentTypes: BUILTIN_SUBAGENT_TYPES,
+                    modelPolicies: MODEL_POLICIES,
                 })
             );
             return;
@@ -226,7 +228,12 @@ const session = await joinSession({
                         const catalog = await fetchCatalog(session, {
                             providerLabels: routing.providerLabels,
                         });
-                        return { routing, catalog, subagentTypes: BUILTIN_SUBAGENT_TYPES };
+                        return {
+                            routing,
+                            catalog,
+                            subagentTypes: BUILTIN_SUBAGENT_TYPES,
+                            modelPolicies: MODEL_POLICIES,
+                        };
                     },
                 },
                 {

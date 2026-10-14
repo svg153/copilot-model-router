@@ -5,8 +5,8 @@ function escapeJsonForScript(value) {
     return JSON.stringify(value).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 
-export function renderHtml({ routing, catalog, effortLevels, subagentTypes }) {
-    const bootstrap = escapeJsonForScript({ routing, catalog, effortLevels, subagentTypes });
+export function renderHtml({ routing, catalog, effortLevels, subagentTypes, modelPolicies }) {
+    const bootstrap = escapeJsonForScript({ routing, catalog, effortLevels, subagentTypes, modelPolicies });
 
     return `<!doctype html>
 <html lang="en">
@@ -40,6 +40,9 @@ export function renderHtml({ routing, catalog, effortLevels, subagentTypes }) {
   }
   h2 { font-size: 15px; font-weight: var(--font-weight-semibold, 600); margin: 0 0 10px; }
   .row { display: grid; grid-template-columns: 120px 1fr 120px; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .row.subagent { grid-template-columns: 140px 1fr 100px 120px; }
+  .row.head { margin-bottom: 4px; }
+  .row.head span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-color-muted, #59636e); }
   .row .name { font-weight: var(--font-weight-semibold, 600); }
   .row .hint { grid-column: 2 / -1; color: var(--text-color-muted, #59636e); font-size: 12px; margin: -4px 0 4px; }
   select, input[type=number] {
@@ -106,6 +109,7 @@ export function renderHtml({ routing, catalog, effortLevels, subagentTypes }) {
   <section>
     <h2>Pinned subagents</h2>
     <div id="subagents"></div>
+    <p class="legend"><code>required</code> refuses an explicit model override, so a subagent cannot be escalated to a premium model. <code>preferred</code> is advisory. <code>inherit</code> leaves the runtime default in place.</p>
     <div class="grid2" style="margin-top:10px">
       <div class="field">
         <label for="maxConcurrency">Max concurrent subagents</label>
@@ -170,6 +174,17 @@ function effortSelect(value, onInput) {
   return select;
 }
 
+function policySelect(value, onInput) {
+  const select = el("select", {});
+  select.append(el("option", { value: "", textContent: "inherit" }));
+  for (const policy of BOOT.modelPolicies) {
+    select.append(el("option", { value: policy, textContent: policy }));
+  }
+  select.value = value ?? "";
+  select.addEventListener("change", () => onInput(select.value || null));
+  return select;
+}
+
 const ROLE_LABELS = {
   plan: ["Plan", "Architecture, decomposition, hard reasoning."],
   execute: ["Execute", "Bulk work: search, summarize, mechanical edits."],
@@ -194,12 +209,22 @@ function renderRoles() {
 function renderSubagents() {
   const host = document.getElementById("subagents");
   host.replaceChildren();
+  host.append(el("div", { className: "row subagent head" }, [
+    el("span", { textContent: "Agent" }),
+    el("span", { textContent: "Model" }),
+    el("span", { textContent: "Effort" }),
+    el("span", { textContent: "Enforcement" }),
+  ]));
   for (const type of BOOT.subagentTypes) {
     const entry = state.subagents.agents[type] ?? {};
-    host.append(el("div", { className: "row" }, [
+    const set = (field, value) => {
+      state.subagents.agents[type] = { ...state.subagents.agents[type], [field]: value };
+    };
+    host.append(el("div", { className: "row subagent" }, [
       el("code", { textContent: type }),
-      modelSelect(entry.model, (v) => { state.subagents.agents[type] = { ...state.subagents.agents[type], model: v }; }),
-      effortSelect(entry.effortLevel, (v) => { state.subagents.agents[type] = { ...state.subagents.agents[type], effortLevel: v }; }),
+      modelSelect(entry.model, (v) => set("model", v)),
+      effortSelect(entry.effortLevel, (v) => set("effortLevel", v)),
+      policySelect(entry.modelPolicy, (v) => set("modelPolicy", v)),
     ]));
   }
   document.getElementById("maxConcurrency").value = state.subagents.maxConcurrency ?? "";

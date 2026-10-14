@@ -161,6 +161,15 @@ export function expensiveModelIds(catalog) {
 
 export const EFFORT_LEVELS = ["none", "low", "medium", "high", "xhigh", "max"];
 
+/**
+ * How strictly a pinned subagent model is enforced (AgentModelPolicy in the SDK).
+ *
+ * "required" refuses an explicit model override, so a caller cannot escalate a
+ * subagent to a premium model. "preferred" is advisory: the pin is the default
+ * but an explicit model wins. Absent means the runtime default applies.
+ */
+export const MODEL_POLICIES = ["required", "preferred"];
+
 /** Built-in subagent types this extension pins a model for. */
 export const BUILTIN_SUBAGENT_TYPES = [
     "explore",
@@ -209,10 +218,32 @@ export const DEFAULT_ROUTING = {
 
 /** Human-readable policy injected into the session so the agent routes deliberately. */
 export function policyProse(routing, catalog = []) {
-    const lines = BUILTIN_SUBAGENT_TYPES.map((type) => {
-        const entry = routing.subagents?.agents?.[type];
-        return entry?.model ? `- ${type} -> ${entry.model}` : null;
-    }).filter(Boolean);
+    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
+        type,
+        entry: routing.subagents?.agents?.[type],
+    })).filter(({ entry }) => entry?.model);
+
+    const enforced = agents.filter(({ entry }) => entry.modelPolicy === "required");
+    const advisory = agents.filter(({ entry }) => entry.modelPolicy !== "required");
+
+    const lines = [
+        ...enforced.map(({ type, entry }) => `- ${type} -> ${entry.model} (enforced)`),
+        ...advisory.map(({ type, entry }) => `- ${type} -> ${entry.model} (advisory)`),
+    ];
+
+    const enforcement = [];
+    if (enforced.length) {
+        enforcement.push(
+            `Enforced (modelPolicy=required) for ${enforced.map(({ type }) => type).join(", ")}: ` +
+                "spawning one of those subagent types always uses the pinned model, and an explicit model override is refused."
+        );
+    }
+    if (advisory.length) {
+        enforcement.push(
+            `Advisory (modelPolicy=preferred) for ${advisory.map(({ type }) => type).join(", ")}: ` +
+                "the pin is the default, but an explicit model override wins."
+        );
+    }
 
     const expensive = expensiveModelIds(catalog);
     const free = catalog
@@ -240,7 +271,7 @@ export function policyProse(routing, catalog = []) {
         `- Verification and cross-checking -> ${routing.roles.verify.model}`,
         "Pinned subagent types:",
         ...lines,
-        "Those pins are enforced (modelPolicy=required): spawning one of those subagent types always uses the pinned model, and an explicit model override is refused.",
+        ...enforcement,
         ...budget,
         `For the plan-then-execute workflow, invoke run_dynamic_workflow with name "plan-then-execute".`,
         "Do not switch the session to Auto for bulk work; Auto escalates to premium models.",
@@ -248,7 +279,27 @@ export function policyProse(routing, catalog = []) {
     ].join("\n");
 }
 
-function mergeRouting(base, patch) {
+/**
+ * Field-level merge for one agent entry; a null field unsets it.
+ *
+ * Used for canvas patches, where a partial entry (say just `model`) must keep
+ * the fields it does not mention.
+ */
+function mergeAgentEntry(current, patch) {
+    const merged = { ...current };
+    for (const [field, value] of Object.entries(patch ?? {})) {
+        if (value === null) delete merged[field];
+        else merged[field] = value;
+    }
+    return merged;
+}
+
+/**
+ * `replaceAgentEntries` is for merging a *persisted* file over the defaults: an
+ * agent the file mentions wins wholesale, so unsetting a field there is not
+ * silently refilled by the default for that same agent.
+ */
+function mergeRouting(base, patch, { replaceAgentEntries = false } = {}) {
     if (!patch || typeof patch !== "object") return base;
     const out = {
         version: base.version,
@@ -270,8 +321,13 @@ function mergeRouting(base, patch) {
     }
     if (patch.subagents?.agents) {
         for (const [type, entry] of Object.entries(patch.subagents.agents)) {
-            if (entry === null) delete out.subagents.agents[type];
-            else out.subagents.agents[type] = { ...out.subagents.agents[type], ...entry };
+            if (entry === null) {
+                delete out.subagents.agents[type];
+                continue;
+            }
+            out.subagents.agents[type] = replaceAgentEntries
+                ? { ...entry }
+                : mergeAgentEntry(out.subagents.agents[type], entry);
         }
     }
     if (Array.isArray(patch.subagents?.disabledSubagents)) {
@@ -288,7 +344,7 @@ function mergeRouting(base, patch) {
 export async function loadRouting() {
     try {
         const raw = await readFile(ROUTING_FILE, "utf8");
-        return mergeRouting(DEFAULT_ROUTING, JSON.parse(raw));
+        return mergeRouting(DEFAULT_ROUTING, JSON.parse(raw), { replaceAgentEntries: true });
     } catch {
         // Missing or corrupt config falls back to defaults rather than failing a run.
         return mergeRouting(DEFAULT_ROUTING, null);

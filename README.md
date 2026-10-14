@@ -8,7 +8,7 @@ premium por culpa de `Auto`.
 
 | Pieza | Qué hace |
 | --- | --- |
-| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo de cada subagente. |
+| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
 | Workflow `plan-then-execute` | Un modelo caro planifica, modelos baratos ejecutan en paralelo, un tercer modelo verifica. |
 | Ajustes de subagentes | Se aplican a la sesión viva vía `session.rpc.tools.updateSubagentSettings`. |
@@ -24,7 +24,20 @@ premium por culpa de `Auto`.
 
 Los seis subagentes integrados (`explore`, `task`, `general-purpose`, `code-review`,
 `research`, `security-review`) se fijan al modelo barato con `contextTier: inherit` y
-`modelPolicy: "required"`, es decir **obligatorio**: el agente no puede saltárselo.
+`modelPolicy: "required"`.
+
+### Columna *Enforcement*
+
+Cada fila de subagente tiene un desplegable **Enforcement** con tres opciones:
+
+| Valor | Efecto |
+| --- | --- |
+| `required` | La fijación es **obligatoria**: si el agente pide otro modelo en la llamada al tool `task`, se rechaza y se usa el fijado. |
+| `preferred` | La fijación es la **opción por defecto**, pero un `model` explícito en la llamada gana. |
+| *inherit* (vacío) | No se escribe `modelPolicy`; aplica el comportamiento por defecto del runtime. |
+
+`inherit` borra la clave del fichero de configuración en lugar de escribir un valor, así
+que la entrada del subagente vuelve a comportarse como si esta extensión no la tocara.
 
 ## Cómo llega el modelo a un subagente
 
@@ -38,8 +51,8 @@ Orden de resolución, de mayor a menor prioridad:
 
 `modelPolicy` decide qué ocurre cuando el paso 1 choca con el 2 o el 3:
 
-- `"preferred"` (por defecto) → gana el override del paso 1; la fijación es solo una
-  sugerencia y el agente puede escalar a un modelo premium.
+- `"preferred"` (valor por defecto del runtime) → gana el override del paso 1; la
+  fijación es solo una sugerencia y el agente puede escalar a un modelo premium.
 - `"required"` → el override del paso 1 se rechaza; siempre se usa el modelo fijado.
 
 ## Catálogo de modelos
