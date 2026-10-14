@@ -161,6 +161,10 @@ dl.defs dd { margin: 2px 0 0; color: var(--text-color-muted, #59636e); }
     padding: 16px 10px; color: var(--text-color-muted, #59636e);
     font-style: italic; text-align: center;
 }
+.est {
+    color: var(--true-color-yellow, #9a6700);
+    font-weight: var(--font-weight-semibold, 600); cursor: help;
+}
 
 .filters {
     display: grid; gap: 10px; margin-bottom: 18px; padding: 12px;
@@ -363,6 +367,13 @@ const BODY = `
       <dd>Nota global: cuanto más grande, mejor.</dd>
       <dt>Color</dt>
       <dd>Fabricante. Las esferas con halo son los modelos que tienes disponibles ahora mismo.</dd>
+      <dt>Esferas huecas</dt>
+      <dd>
+        Modelos que el benchmark público midió pero para los que no hay precio público. No pueden colocarse
+        en un eje de precio, así que van en su propio carril, a la derecha de la caja, con una línea
+        discontinua y el rótulo <b>sin precio público</b>. Se dibujan huecas para que nunca se lean como el
+        modelo más caro.
+      </dd>
     </dl>
   </div>
 </section>
@@ -449,7 +460,10 @@ var benchSort = { key: "total", dir: -1 };
 // Which models the recommendations, the chart and the 3D view are allowed to
 // use. "picked" is keyed by the snapshot's normalised id and null means "all".
 var filters = { provider: "all", picked: null };
-var benchOnlyMine = false;
+// The leaderboard carries every model the public benchmark scored, most of
+// which you cannot pick. The table opens on your own models; the toggle widens
+// it to the full field for context.
+var benchOnlyMine = true;
 
 var SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -629,6 +643,21 @@ function findModel(id) {
       if (group.models[j].id === id) return group.models[j];
     }
   }
+  // La tabla de benchmarks y el 3D llevan la clave normalizada, no el id crudo.
+  for (var k = 0; k < catalog.length; k++) {
+    var models = catalog[k].models;
+    for (var m = 0; m < models.length; m++) {
+      if (modelKey(models[m]) === id) return models[m];
+    }
+  }
+  return null;
+}
+
+function findBenchRow(id) {
+  var rows = scoredRows();
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].id === id) return rows[i];
+  }
   return null;
 }
 
@@ -726,7 +755,7 @@ function togglePick(key) {
 
 function clearFilters() {
   filters = { provider: "all", picked: null };
-  benchOnlyMine = false;
+  benchOnlyMine = true;
   renderFiltered();
 }
 
@@ -821,8 +850,9 @@ function renderFilterNote() {
     if (filters.picked) parts.push("Selección manual de modelos.");
     parts.push("Las recomendaciones de la pestaña Enrutado se están calculando solo con estos modelos.");
   }
-  parts.push("Las notas de la tabla de abajo solo existen para los modelos que aparecen en el benchmark público; " +
-    "un modelo filtrado sin fila aquí no tiene notas, pero sí se evalúa por precio y velocidad.");
+  parts.push("Las notas salen del ranking público; si tu modelo no está medido directamente, " +
+    "se estima a partir de variantes de su familia y se marca con ~. Un modelo sin ninguna " +
+    "referencia se evalúa solo por precio y velocidad, y la tarjeta lo avisa.");
   document.getElementById("filterNote").textContent = parts.join(" ");
 }
 
@@ -1130,7 +1160,14 @@ function defs(hostId, entries) {
   var host = clear(hostId);
   entries.forEach(function (pair) {
     host.append(el("dt", { textContent: pair[0] }));
-    host.append(el("dd", { textContent: pair[1] }));
+    var dd = el("dd");
+    if (pair[2]) {
+      dd.append(document.createTextNode(pair[1] + " "));
+      dd.append(el("a", { href: pair[2], target: "_blank", rel: "noreferrer noopener", textContent: pair[2] }));
+    } else {
+      dd.textContent = pair[1];
+    }
+    host.append(dd);
   });
 }
 
@@ -1298,6 +1335,11 @@ function renderRecommendations() {
 function renderProfile() {
   var host = clear("profile");
   var model = selectedId ? findModel(selectedId) : null;
+  var fromBench = false;
+  if (!model && selectedId) {
+    model = findBenchRow(selectedId);
+    fromBench = !!model;
+  }
   if (!model) {
     document.getElementById("profileSub").textContent = "Haz clic en cualquier fila de la tabla de abajo para ver su perfil.";
     host.append(el("p", { className: "small muted", textContent: "Sin modelo seleccionado." }));
@@ -1305,12 +1347,18 @@ function renderProfile() {
   }
 
   document.getElementById("profileSub").textContent = model.label + " — " + vendorOf(model) +
-    (model.external ? " (clave propia)" : " (plan de Copilot)");
+    (fromBench ? " (solo en el ranking público; no está en tu catálogo)"
+      : model.external ? " (clave propia)" : " (plan de Copilot)");
 
   var keys = Object.keys(model.bench || {});
   if (!keys.length) {
     host.append(el("p", { className: "small muted", textContent: "Este modelo todavía no tiene notas públicas de benchmark." }));
   } else {
+    if (model.benchEstimated) {
+      host.append(el("p", { className: "small warn-line", style: { marginTop: "0" },
+        textContent: "~ " + (model.benchNote || "Nota estimada a partir de variantes de la misma familia") +
+          ". Es una estimación, no una medida directa del benchmark." }));
+    }
     keys.forEach(function (key) {
       var value = model.bench[key];
       if (typeof value !== "number") return;
@@ -1418,6 +1466,41 @@ function renderScatter() {
   });
 }
 
+/**
+ * Leaderboard rows plus the models you can actually pick that the leaderboard
+ * never scored directly but whose family supplied an estimate. Without the
+ * second half a filtered table can come back empty for a model you are able to
+ * choose, which reads as missing data rather than as a gap in the source.
+ */
+function scoredRows() {
+  var rows = benchRows.slice();
+  var seen = {};
+  benchRows.forEach(function (row) { seen[row.id] = true; });
+  allModels().forEach(function (model) {
+    var key = modelKey(model);
+    if (seen[key] || !model.bench || typeof model.bench.total !== "number") return;
+    seen[key] = true;
+    rows.push({
+      id: key,
+      label: model.label || key,
+      vendor: model.vendor || null,
+      tier: model.tier || null,
+      blendedCost: typeof model.blendedCost === "number" ? model.blendedCost : null,
+      context: model.context || null,
+      releaseDate: model.releaseDate || null,
+      reasoning: model.reasoning || null,
+      bench: model.bench,
+      rank: model.rank || null,
+      speed: model.speed || null,
+      latencyS: typeof model.latencyS === "number" ? model.latencyS : null,
+      sources: model.sources || [],
+      estimated: model.benchEstimated === true,
+      note: model.benchNote || null
+    });
+  });
+  return rows;
+}
+
 function benchValue(row, key) {
   if (key === "label") return row.label;
   if (key === "vendor") return row.vendor || "";
@@ -1463,7 +1546,8 @@ function renderBenchTable() {
   allModels().forEach(function (model) { mine[modelKey(model)] = true; });
 
   var limit = activeKeySet();
-  var rows = benchRows.filter(function (row) {
+  var scored = scoredRows();
+  var rows = scored.filter(function (row) {
     if (benchOnlyMine && !mine[row.id]) return false;
     if (limit && !limit[row.id]) return false;
     return true;
@@ -1489,6 +1573,13 @@ function renderBenchTable() {
         : column[2] === "num" ? num(value)
         : (value || "—");
       var cell = el("td", { className: column[2] === "num" ? "num small" : "small", textContent: text });
+      if (column[0] === "label" && row.estimated) {
+        cell.append(el("span", {
+          className: "est",
+          textContent: " ~",
+          title: row.note || "Nota estimada a partir de variantes de la misma familia"
+        }));
+      }
       if (column[0] === "vendor" && row.vendor) {
         cell.replaceChildren(
           el("span", { className: "dot", style: { background: vendorColor(row.vendor) } }),
@@ -1499,17 +1590,25 @@ function renderBenchTable() {
     });
     body.append(tr);
   });
+  var estimatedShown = rows.filter(function (row) { return row.estimated; }).length;
   if (!rows.length) {
     body.append(el("tr", { className: "empty-row" }, [
-      el("td", { colSpan: 10, textContent: "Ninguno de los modelos filtrados tiene notas de benchmarks públicos todavía. Los benchmarks públicos solo cubren modelos conocidos: los modelos internos de GitHub Copilot no aparecen aquí." })
+      el("td", {
+        colSpan: columns.length,
+        textContent: benchOnlyMine
+          ? "Ninguno de los modelos que puedes elegir tiene notas públicas ni una estimación por familia. Desactiva el botón de arriba para ver los " + scored.length + " modelos que sí están medidos, aunque no puedas escogerlos."
+          : "Ninguno de los modelos filtrados tiene notas de benchmarks públicos todavía."
+      })
     ]));
   }
   table.append(body);
 
-  document.getElementById("benchSub").textContent =
-    rows.length + " de " + benchRows.length + " modelos con notas públicas" +
-    (limit ? " (filtrados)" : "") +
-    ". Las filas resaltadas son modelos que tienes disponibles ahora mismo.";
+  var sub = rows.length + " de " + scored.length + " modelos con notas" +
+    (benchOnlyMine ? " · solo los que puedes elegir" : " · todo el campo público") +
+    (limit ? " · filtrados" : "") + ".";
+  if (!benchOnlyMine) sub += " Las filas resaltadas son modelos que tienes disponibles.";
+  if (estimatedShown) sub += " Los marcados con ~ son estimaciones por familia, no medidas directas.";
+  document.getElementById("benchSub").textContent = sub;
 }
 
 function renderBenchMeta() {
@@ -1520,6 +1619,11 @@ function renderBenchMeta() {
   else parts.push("Sin datos: no se pudo leer ninguna instantánea.");
   if (benchMeta && benchMeta.counts) {
     parts.push(benchMeta.counts.models + " modelos, " + benchMeta.counts.withBenchmarks + " con benchmark, " + benchMeta.counts.withVendor + " con fabricante.");
+  }
+  if (benchMeta && benchMeta.sources && benchMeta.sources.length) {
+    parts.push("Fuentes: " + benchMeta.sources.map(function (source) {
+      return typeof source === "string" ? source : (source.id || source.url || "?");
+    }).join(", ") + ".");
   }
   if (repoUrl) parts.push("Origen: " + repoUrl);
   document.getElementById("benchMeta").textContent = parts.join(" ");
@@ -1541,17 +1645,17 @@ function currentSceneSignature() {
   if (filters.picked) {
     picked = Object.keys(filters.picked).filter(function (key) { return filters.picked[key]; }).sort().join(",");
   }
-  return filters.provider + "|" + picked + "|" + benchRows.length;
+  return filters.provider + "|" + picked + "|" + benchRows.length + "|" + allModels().length;
 }
 
 /**
- * Every benchmark row is always plotted, so the landscape and the reference
+ * Every scored row is always plotted, so the landscape and the reference
  * frame stay comparable. The filter only decides which ones get a ring and
  * which ones fade into the background.
  */
 function scenePoints() {
   var limit = activeKeySet();
-  return benchRows.filter(function (row) {
+  return scoredRows().filter(function (row) {
     return row.bench && typeof row.bench.total === "number";
   }).map(function (row) {
     var active = !limit || limit[row.id] === true;
@@ -1562,6 +1666,7 @@ function scenePoints() {
       total: row.bench.total,
       cost: typeof row.blendedCost === "number" ? row.blendedCost : null,
       speed: row.speed && typeof row.speed.outputTps === "number" ? row.speed.outputTps : null,
+      estimated: row.estimated === true,
       mine: active && isMine(row.id),
       dim: !active
     };
@@ -1599,8 +1704,14 @@ function buildScene(THREE) {
   var yMax = totals.length ? Math.max.apply(null, totals) : 90;
 
   var span = 200;
+  // A sphere with no public price cannot be placed on a log-price axis. Parking
+  // it at the axis maximum made it look like the most expensive model in the
+  // field, so unpriced models get their own lane past the price box instead.
+  var xEnd = span * 0.5;
+  var laneX = xEnd;
   function px(point) {
-    var v = point.cost === null ? xMax : Math.log10(point.cost + 0.05);
+    if (point.cost === null) return laneX;
+    var v = Math.log10(point.cost + 0.05);
     return ((v - xMin) / ((xMax - xMin) || 1) - 0.5) * span;
   }
   function py(point) { return ((point.total - yMin) / ((yMax - yMin) || 1) - 0.5) * span * 0.7; }
@@ -1612,12 +1723,17 @@ function buildScene(THREE) {
   var geometry = new THREE.SphereGeometry(1, 16, 12);
   var pickable = [];
   function pointRadius(point) { return 2.6 + (point.total / 100) * 5.4; }
+  var maxTotal = totals.length ? Math.max.apply(null, totals) : 100;
+  laneX = xEnd + (2.6 + (maxTotal / 100) * 5.4) * 3.6;
   points.forEach(function (point) {
     var radius = pointRadius(point);
+    var unpriced = point.cost === null;
     var material = new THREE.MeshBasicMaterial({
       color: vendorHex(point.vendor),
       transparent: true,
-      opacity: point.dim ? 0.16 : point.mine ? 0.98 : 0.62
+      opacity: point.dim ? 0.16 : unpriced ? 0.5 : point.mine ? 0.98 : 0.62,
+      // A hollow shell reads as "not on this scale" instead of as a value.
+      wireframe: unpriced
     });
     var mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(px(point), py(point), pz(point));
@@ -1641,9 +1757,19 @@ function buildScene(THREE) {
   // largest sphere, so the wireframe, the floor grid, the arrows and the tick
   // labels all agree with where the spheres actually sit.
   var dataBox = new THREE.Box3();
-  points.forEach(function (point) {
+  // Unpriced spheres live in their own lane outside the price box and must not
+  // stretch it, or the price axis would look like it reaches further than it
+  // does. Their height and depth still have to fall inside the frame.
+  var priced = points.filter(function (point) { return point.cost !== null; });
+  (priced.length ? priced : points).forEach(function (point) {
     dataBox.expandByPoint(new THREE.Vector3(px(point), py(point), pz(point)));
   });
+  if (priced.length && priced.length !== points.length) {
+    points.forEach(function (point) {
+      dataBox.expandByPoint(new THREE.Vector3(dataBox.min.x, py(point), pz(point)));
+      dataBox.expandByPoint(new THREE.Vector3(dataBox.max.x, py(point), pz(point)));
+    });
+  }
   var biggest = 0;
   points.forEach(function (point) { biggest = Math.max(biggest, pointRadius(point)); });
   dataBox.expandByScalar(biggest * 1.05);
@@ -1756,6 +1882,29 @@ function buildScene(THREE) {
     frame.add(sprite);
   });
 
+  // Mark the unpriced lane so a hollow sphere is never mistaken for a value.
+  var unpricedCount = points.filter(function (point) { return point.cost === null; }).length;
+  if (unpricedCount) {
+    var laneTop = dataBox.max.y + biggest * 2.2;
+    var laneBottom = dataBox.min.y - biggest * 1.6;
+    var laneZ = dataBox.min.z - pad * 2;
+    var laneGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(laneX, laneBottom, laneZ),
+      new THREE.Vector3(laneX, laneTop, laneZ)
+    ]);
+    var laneLine = new THREE.Line(laneGeometry,
+      new THREE.LineDashedMaterial({ color: 0x8c96a3, dashSize: biggest, gapSize: biggest * 0.6 }));
+    laneLine.computeLineDistances();
+    laneLine.material.transparent = true;
+    laneLine.material.opacity = 0.6;
+    laneLine.material.depthWrite = false;
+    frame.add(laneLine);
+
+    var laneLabel = makeLabel("sin precio público", "#59636e", LABEL_H * 1.05);
+    laneLabel.position.set(laneX, laneBottom - LABEL_H, laneZ);
+    frame.add(laneLabel);
+  }
+
   var theta = 0.9;
   var phi = 1.15;
 
@@ -1856,7 +2005,8 @@ function buildScene(THREE) {
   var status = document.getElementById("sceneStatus");
   if (status) {
     status.textContent = points.length + " esferas · " + highlighted + " con halo (tus modelos)" +
-      (dimmed ? " · " + dimmed + " atenuadas por el filtro" : "");
+      (dimmed ? " · " + dimmed + " atenuadas por el filtro" : "") +
+      (unpricedCount ? " · " + unpricedCount + " sin precio público (huecas, en su carril)" : "");
   }
 
   updateCamera();
@@ -1925,11 +2075,18 @@ function renderSceneLegend() {
     ]));
   });
   var highlighted = points.filter(function (point) { return point.mine; }).length;
+  var unpriced = points.filter(function (point) { return point.cost === null; }).length;
   legend.append(el("span", {
     className: "tiny",
     textContent: highlighted + " modelos resaltados con halo" +
       (filterActive() ? " (" + activeModels().length + " pasan el filtro actual)" : "")
   }));
+  if (unpriced) {
+    legend.append(el("span", {
+      className: "tiny",
+      textContent: unpriced + " esferas huecas: sin precio público, fuera del eje X"
+    }));
+  }
   renderAxisKey();
 }
 
@@ -1981,21 +2138,30 @@ function renderGuide() {
     ["Instantánea de datos", "Un fichero JSON con fabricantes, precios, notas de benchmark y velocidades, generado desde fuentes públicas y actualizado periódicamente por el propio repositorio."],
     ["Filtro por proveedor", "Reduce todo lo que ves a los modelos de un solo proveedor. Al elegir tu proveedor externo, las seis recomendaciones y los subagentes se recalculan usando solo esos modelos: sirve para comprobar qué conviene dentro de lo que ya pagas."],
     ["Selección de modelos", "Puedes quitar modelos concretos de la comparación con un clic. El primer clic deja seleccionados todos y desmarca el que pulsaste, así que se quita de uno en uno. Mientras haya selección manual, todo se calcula con los que queden."],
-    ["Solo mis modelos en la tabla", "La tabla tiene los 88 modelos del ranking público. Este interruptor la recorta a las filas que coinciden con tu catálogo, para no perder de vista los tuyos entre los demás."]
+    ["Solo mis modelos en la tabla", "La tabla arranca mostrando solo las filas que coinciden con tu catálogo, para no perder de vista los tuyos entre los demás. Al desactivarlo aparecen los 88 modelos del ranking público, útiles como referencia aunque no puedas escogerlos."],
+    ["Notas estimadas (~)", "Si el benchmark no midió tu modelo exacto pero sí variantes de su familia, la nota es la mediana de esas variantes y va marcada con una tilde. Nunca se presenta como una medida directa."]
   ]);
 }
 
 function renderSources() {
   defs("sourceDefs", [
-    ["models.dev", "Catálogo abierto de proveedores y modelos. Aporta fabricante, precios, contexto, capacidades y pesos abiertos."],
-    ["chinese-llm-benchmark", "Repositorio público con clasificaciones por capacidad: razonamiento, código, uso de herramientas, terminal, medicina, derecho, finanzas…"],
-    ["showdown", "Comparativa pública de velocidad y latencia, usada además para contrastar precios y completar huecos."],
-    ["Instantánea", "Los tres se cruzan en un único JSON que se descarga el propio panel. Si no hay conexión, se usa la copia incluida con la extensión."],
-    ["Actualización automática", "Un flujo de trabajo del repositorio regenera la instantánea cada semana y la publica, así que el panel no tiene que mantener ninguna lista a mano."]
+    ["models.dev", "Catálogo abierto de proveedores y modelos. Aporta fabricante, precios, contexto, capacidades y pesos abiertos. Licencia MIT. Mantenido por el proyecto anomalyco (antes sst).",
+      "https://github.com/anomalyco/models.dev"],
+    ["chinese-llm-benchmark", "Repositorio público con clasificaciones por capacidad: razonamiento, código, uso de herramientas, terminal, medicina, derecho, finanzas… De aquí salen todas las notas de benchmark. Es el trabajo de jeinlee1991 y colaboradores; el repositorio no declara una licencia explícita, así que solo se reproducen las puntuaciones numéricas ya publicadas, sin copiar su código ni su texto.",
+      "https://github.com/jeinlee1991/chinese-llm-benchmark"],
+    ["showdown", "Comparativa pública de velocidad y latencia, usada además para contrastar precios y completar huecos. Licencia AGPL-3.0. De aquí solo se extraen los valores numéricos de velocidad; no se reutiliza su código.",
+      "https://github.com/verseles/showdown"],
+    ["three.js", "Biblioteca con la que se dibuja la pestaña 3D. Se incluye empaquetada dentro de la extensión, así que el panel funciona sin conexión. Licencia MIT.",
+      "https://github.com/mrdoob/three.js"],
+    ["Instantánea", "Las tres fuentes de datos se cruzan en un único JSON que se descarga el propio panel. Si no hay conexión, se usa la copia incluida con la extensión."],
+    ["Actualización automática", "Un flujo de trabajo del repositorio regenera la instantánea cada semana y la publica, así que el panel no tiene que mantener ninguna lista a mano."],
+    ["~ (nota estimada)", "Cuando el benchmark no midió ese modelo exacto pero sí variantes de su misma familia, se muestra la mediana de esas variantes marcada con una tilde. Es una estimación, no una medida directa, y el panel lo dice explícitamente en lugar de dejarlo pasar por un dato real."],
+    ["Sin precio público", "Algunos modelos medidos no publican tarifa. No se pueden colocar en un eje de precio, así que la tabla los deja sin coste y el 3D los dibuja huecos en un carril aparte."]
   ]);
   var parts = [];
   if (benchMeta && benchMeta.generatedAt) parts.push("Instantánea actual: " + benchMeta.generatedAt.slice(0, 10) + ".");
   parts.push(benchSource === "downloaded" ? "Se está usando la versión descargada del repositorio." : benchSource === "bundled" ? "Se está usando la copia incluida con la extensión." : "No se ha podido cargar ninguna instantánea.");
+  if (repoUrl) parts.push("Repositorio del panel: " + repoUrl);
   document.getElementById("sourceMeta").textContent = parts.join(" ");
 }
 

@@ -94,8 +94,9 @@ datos se resuelven en cascada, de más fiable a menos:
 1. **Runtime** — si el modelo trae fabricante propio, se usa ese.
 2. **Instantánea pública** (`model-router/data/models-enriched.json`) — cruce por id
    normalizado (`glm5.3-flash` → `glm53flash`), con `aliases` para los nombres alternativos.
-3. **Familia** — si el id exacto no está, se busca por prefijo (`qwen3.6` → `qwen3.8-flash`)
-   y solo se aceptan los campos en los que **todos** los candidatos coinciden.
+3. **Familia** — si el id exacto no está, se busca por prefijo **solo hacia abajo**
+   (`qwen3.6` → `qwen3.6-*`, nunca `qwen3.8-flash`) y solo se aceptan los campos en los que
+   **todos** los candidatos coinciden, para no inventar un precio.
 4. **Heurística sobre el id** — último recurso: `glm` → Z.ai, `mimo` → Xiaomi,
    `deepseek` → DeepSeek, `kimi`/`moonshot` → Moonshot AI, `hydrafusion` → GitHub Copilot, etc.
 
@@ -108,7 +109,7 @@ quedan en el paso 1 o 4, porque no aparecen en ninguna fuente abierta.
 
 | Fuente | Aporta |
 | --- | --- |
-| [`models.dev/api.json`](https://models.dev/api.json) | Fabricante, familia, contexto, capacidades y precio de API. Se filtra a los proveedores creadores: de ~8.800 entradas quedan 371 modelos. |
+| [`anomalyco/models.dev`](https://github.com/anomalyco/models.dev) | Fabricante, familia, contexto, capacidades y precio de API. Se filtra a los proveedores creadores: de ~8.800 entradas quedan 371 modelos. |
 | [`jeinlee1991/chinese-llm-benchmark`](https://github.com/jeinlee1991/chinese-llm-benchmark) | Notas reales de razonamiento, código, agentes, `TAU` y `Terminal-Bench`. Es la fuente de calidad. |
 | [`verseles/showdown`](https://github.com/verseles/showdown) | Velocidad de salida y latencia del primer token. Se usa como contraste y para completar familias. |
 
@@ -120,6 +121,53 @@ reciente y se cachea en `artifacts/`.
 > No hay ninguna API pública y sin clave que devuelva notas de calidad: LMArena responde
 > 403, Artificial Analysis 401 y el dataset de HuggingFace está restringido. Por eso el
 > ranking se construye con un repositorio mantenido en GitHub en lugar de consultarse en vivo.
+
+### Fuentes de datos y créditos
+
+Ninguno de estos datos es propio: todo el mérito es de los proyectos que los publican. Se
+enumeran aquí para que quede claro de dónde sale cada cifra y bajo qué condiciones se usa.
+
+| Origen | Qué se usa | Licencia | Enlace |
+| --- | --- | --- | --- |
+| **anomalyco/models.dev** (antes `sst/models.dev`) | Fabricante, precios, contexto, capacidades y pesos abiertos | **MIT** | <https://github.com/anomalyco/models.dev> |
+| **jeinlee1991/chinese-llm-benchmark** | Todas las notas de benchmark | **Sin licencia declarada** | <https://github.com/jeinlee1991/chinese-llm-benchmark> |
+| **verseles/showdown** | Velocidad de salida y latencia del primer token | **AGPL-3.0** | <https://github.com/verseles/showdown> |
+| **three.js** | Dibujo de la pestaña 3D (empaquetado, funciona sin conexión) | **MIT** | <https://github.com/mrdoob/three.js> |
+
+Dos matices de licencia que conviene tener presentes:
+
+- **`verseles/showdown` es AGPL-3.0.** De ahí solo se extraen **valores numéricos** de
+  velocidad y latencia —no se copia código ni se enlaza su biblioteca—, pero la licencia
+  está declarada y el origen acreditado. Si prefieres no depender de una fuente AGPL,
+  quitarla solo cuesta el eje de velocidad del 3D y la columna *Velocidad* de la tabla.
+- **`jeinlee1991/chinese-llm-benchmark` no declara licencia.** Es un repositorio público
+  de investigación con las puntuaciones ya publicadas; solo se reproducen esos números,
+  sin copiar su código ni su texto. Si el proyecto publica una licencia más adelante,
+  conviene revisarla.
+
+El script que hace el cruce (`scripts/build-data.mjs`) deja constancia de las tres URLs en
+`meta.sources` de la instantánea, y la pestaña **Guía** del panel las muestra con enlace
+directo.
+
+#### La tilde `~` en las notas
+
+Cuando el benchmark no midió **ese** modelo exacto pero sí variantes de su misma familia,
+el panel calcula la **mediana por métrica** de esas variantes y la marca con `~`:
+
+- `deepseek-v4-flash` → estimado a partir de `deepseek-v4-flash-0424`.
+- `qwen3.6` → mediana de las cuatro variantes `qwen3.6-*` medidas.
+
+La búsqueda de familia es **solo hacia abajo** (`qwen3.6-*` sí, `qwen3.8-flash` no), para
+no arrastrar una línea de producto entera, y siempre se presenta como estimación, nunca
+como una medida directa. Sin esta regla, un modelo con fabricante y precio conocidos pero
+sin nota exacta se quedaba sin ninguna referencia de calidad.
+
+#### Modelos sin precio público
+
+28 de los 88 modelos medidos no publican tarifa. No se pueden situar en un eje de precio,
+así que en lugar de amontonarlos en el extremo caro —lo que los hacía parecer los más
+caros— el 3D los dibuja **huecos, en un carril aparte** fuera del eje X, y la tabla los
+deja con coste `—`.
 
 ### Cómo se calcula la recomendación
 
@@ -155,8 +203,8 @@ recomendación, al gráfico, a la tabla y a la leyenda del 3D:
 | **Proveedor** | Deja solo los modelos de ese proveedor. Sirve para responder a la pregunta *"con lo que ya pago, ¿qué me conviene para cada tarea?"*. |
 | **Modelos** | Al pulsar un modelo se quita de la lista; el primer clic siembra la selección con todo lo visible, así que **desmarcas lo que no quieres** en lugar de quedarte con uno solo. |
 | **Ninguno** | Vacía la selección y las tarjetas quedan sin recomendación. |
-| **Solo mis modelos en la tabla** | Deja en la tabla únicamente las filas de los modelos que tienes disponibles. |
-| **Quitar filtros** | Vuelve a los 37 modelos del catálogo. |
+| **Solo mis modelos en la tabla** | **Activado por defecto.** La tabla arranca con las filas que coinciden con tu catálogo, para no perder de vista los tuyos entre los 88 del ranking público. Al desactivarlo aparecen todos, como referencia. |
+| **Quitar filtros** | Vuelve a los 37 modelos del catálogo y reactiva *Solo mis modelos en la tabla*. |
 
 Cuando hay un filtro activo aparece un aviso sobre el panel de enrutado, para que no se
 confunda una recomendación filtrada con la recomendación global. Las notas de calidad se
@@ -174,6 +222,11 @@ Para que girar la escena no te deje sin referencias, el mapa lleva un **marco de
 referencia** fijo: una caja que envuelve los datos, una rejilla en el suelo, tres flechas
 de eje y nueve etiquetas que siempre miran a la cámara con el valor de cada extremo.
 **Reencuadrar** vuelve a la vista inicial y **Girar solo** rota automáticamente.
+
+Los modelos **sin precio público** se dibujan **huecos** (solo aristas, semitransparentes)
+en un carril discontinuo aparte, rotulado *sin precio público*, fuera del eje X. Antes se
+apilaban en el extremo derecho y parecían los más caros del gráfico. La línea de estado
+indica cuántos son.
 
 ## Instalación
 

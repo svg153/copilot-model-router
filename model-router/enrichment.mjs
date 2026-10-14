@@ -94,7 +94,67 @@ export function inferVendor(modelId) {
 function buildIndex(snapshot) {
     const models = snapshot?.models && typeof snapshot.models === "object" ? snapshot.models : {};
     const aliases = snapshot?.aliases && typeof snapshot.aliases === "object" ? snapshot.aliases : {};
-    return { models, aliases, keys: Object.keys(models), generatedAt: snapshot?.meta?.generatedAt ?? null };
+    const keys = Object.keys(models);
+    // Only the scored models matter for the benchmark fallback, and keeping that
+    // list short keeps the family scan cheap.
+    const benchKeys = keys.filter((key) => models[key]?.bench && Object.keys(models[key].bench).length);
+    return { models, aliases, keys, benchKeys, generatedAt: snapshot?.meta?.generatedAt ?? null };
+}
+
+function median(values) {
+    const sorted = values.filter((value) => typeof value === "number").sort((a, b) => a - b);
+    if (!sorted.length) return null;
+    const mid = sorted.length >> 1;
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Benchmark scores for a model the leaderboard does not score directly.
+ *
+ * The snapshot knows far more models than the public leaderboard measures, so a
+ * model can be an exact hit for vendor and price yet carry no benchmark at all.
+ * Rather than leave the panel blank, we look for scored variants of the same
+ * family (the runtime names "deepseek-v4-flash" where the leaderboard measured
+ * "deepseek-v4-flash-0424") and report the median across them. The caller marks
+ * the result as an estimate, so a guess never passes for a measurement.
+ *
+ * Only narrower names are considered. A broader candidate would drag in a whole
+ * product line, which says nothing about the specific model being scored.
+ */
+function lookupBench(index, modelId) {
+    const bare = String(modelId ?? "").split("/").pop();
+    const key = normalizeKey(bare);
+    if (!key || key.length < 4) return null;
+
+    const found = new Set();
+    const aliased = index.aliases[key];
+    if (aliased && index.models[aliased]?.bench) found.add(aliased);
+    for (const candidate of index.benchKeys) {
+        if (candidate === key) continue;
+        if (candidate.startsWith(key)) found.add(candidate);
+    }
+    const candidates = [...found];
+    if (!candidates.length) return null;
+
+    const entries = candidates.map((candidate) => index.models[candidate]).filter((entry) => entry?.bench);
+    if (!entries.length) return null;
+
+    const axes = new Set();
+    entries.forEach((entry) => Object.keys(entry.bench).forEach((axis) => axes.add(axis)));
+    const bench = {};
+    axes.forEach((axis) => {
+        const value = median(entries.map((entry) => entry.bench[axis]));
+        if (value !== null) bench[axis] = Math.round(value * 10) / 10;
+    });
+    if (!Object.keys(bench).length) return null;
+
+    return {
+        bench,
+        note:
+            candidates.length === 1
+                ? `Estimado a partir de ${entries[0].label || candidates[0]}`
+                : `Mediana de ${candidates.length} variantes de la familia ${bare}`,
+    };
 }
 
 /**
@@ -151,14 +211,19 @@ export function applyEnrichment(model, index) {
     const entry = hit?.entry ?? null;
     const exact = hit?.match === "exact";
     const heuristic = inferVendor(model.id);
+    // A model can be an exact hit for vendor and price yet carry no benchmark,
+    // so the family estimate is only consulted when the entry has no scores.
+    const benchFallback = entry?.bench ? null : lookupBench(index, model.id);
 
     const vendor = (exact && entry?.vendor) || model.vendor || entry?.vendor || heuristic || null;
 
     return {
         ...model,
         // The normalized key the benchmark snapshot uses, so the client can match
-        // a catalog model against a public leaderboard row without guessing.
-        key: normalizeKey(model.id),
+        // a catalog model against a public leaderboard row without guessing. A
+        // BYOK id is provider-qualified ("<provider>/<model>"), so the provider
+        // half has to go or the join silently misses.
+        key: normalizeKey(String(model.id).split("/").pop()),
         vendor,
         // How the vendor was established, so the UI can be honest about guesses.
         vendorSource: model.vendor
@@ -177,7 +242,11 @@ export function applyEnrichment(model, index) {
         effortOptions: entry?.effortOptions ?? null,
         cost: entry?.cost ?? null,
         blendedCost: entry?.blendedCost ?? null,
-        bench: entry?.bench ?? null,
+        bench: entry?.bench ?? benchFallback?.bench ?? null,
+        // True when the scores come from a sibling variant rather than from a
+        // direct measurement, so the UI can mark them as an estimate.
+        benchEstimated: !entry?.bench && !!benchFallback,
+        benchNote: entry?.bench ? null : (benchFallback?.note ?? null),
         rank: entry?.rank ?? null,
         rawBenchmarks: entry?.rawBenchmarks ?? null,
         speed: entry?.speed ?? null,
