@@ -95,28 +95,68 @@ export function renderHtml({ routing, catalog, effortLevels, subagentTypes, mode
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .field { display: flex; flex-direction: column; gap: 4px; }
   .field label { font-size: 12px; color: var(--text-color-muted, #59636e); }
+  dl.defs { margin: 0; font-size: 12px; color: var(--text-color-muted, #59636e); }
+  dl.defs dt {
+    font-weight: var(--font-weight-semibold, 600);
+    color: var(--text-color-default, #1f2328);
+    margin-top: 8px;
+  }
+  dl.defs dt:first-child { margin-top: 0; }
+  dl.defs dd { margin: 2px 0 0; }
+  dl.defs code { font-size: 11px; }
 </style>
 </head>
 <body>
   <h1>Model Router</h1>
-  <p class="sub">Premium model plans. Cheap models execute. A third model verifies.</p>
+  <p class="sub">Un modelo premium planifica, modelos baratos ejecutan en paralelo y un tercero verifica.</p>
 
   <section>
-    <h2>Workflow roles</h2>
-    <div id="roles"></div>
+    <h2>Cómo funciona</h2>
+    <dl class="defs">
+      <dt>Roles del workflow</dt>
+      <dd>El modelo de cada fase del workflow <code>plan-then-execute</code>. Adem&aacute;s es lo que lee el agente para repartir el trabajo por su cuenta, as&iacute; que tambi&eacute;n manda fuera del workflow.</dd>
+      <dt>Subagentes fijados</dt>
+      <dd>El modelo de cada tipo de subagente que el agente lanza con la herramienta <code>task</code>. No cambia el modelo de esta sesi&oacute;n: solo el de los subagentes que se lancen.</dd>
+      <dt>Cat&aacute;logo de modelos</dt>
+      <dd>Los modelos que tienes disponibles en esta sesi&oacute;n ahora mismo. Es de solo lectura: sirve para saber qu&eacute; puedes elegir y cu&aacute;nto cuesta cada uno.</dd>
+      <dt>Aplicar / Restaurar</dt>
+      <dd><b>Aplicar</b> guarda estos valores en disco y los aplica a la sesi&oacute;n en curso. <b>Restaurar</b> los devuelve a los valores por defecto de la extensi&oacute;n.</dd>
+    </dl>
   </section>
 
   <section>
-    <h2>Pinned subagents</h2>
+    <h2>Roles del workflow</h2>
+    <p class="legend">Qu&eacute; hace cada rol y con cu&aacute;nto esfuerzo.</p>
+    <div id="roles"></div>
+    <dl class="defs">
+      <dt>Effort (esfuerzo)</dt>
+      <dd>El presupuesto de razonamiento: cu&aacute;nto piensa el modelo antes de responder. <code>high</code> da mejores planes y revisiones, pero tarda m&aacute;s y cuesta m&aacute;s; <code>low</code> basta para trabajo mec&aacute;nico. Sube el esfuerzo en planificar y verificar, y b&aacute;jalo en ejecutar.</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Subagentes fijados</h2>
+    <p class="legend">Un <em>pin</em> fija qu&eacute; modelo usa un tipo de subagente cuando el agente lo lanza.</p>
     <div id="subagents"></div>
-    <p class="legend"><code>required</code> refuses an explicit model override, so a subagent cannot be escalated to a premium model. <code>preferred</code> is advisory. <code>inherit</code> leaves the runtime default in place.</p>
+    <dl class="defs">
+      <dt>Effort (esfuerzo)</dt>
+      <dd>Igual que en los roles. Con varios subagentes en paralelo conviene <code>low</code>: son muchas llamadas y el coste se multiplica.</dd>
+      <dt>Enforcement &mdash; <code>required</code></dt>
+      <dd><b>Obligatorio.</b> Si el agente intenta lanzar este subagente con otro modelo, se rechaza y se usa el fijado. Es lo que impide que se escape a un modelo premium.</dd>
+      <dt>Enforcement &mdash; <code>preferred</code></dt>
+      <dd><b>Sugerencia.</b> Se usa el modelo fijado salvo que el agente pida otro expl&iacute;citamente; entonces gana el suyo.</dd>
+      <dt>Enforcement &mdash; <code>inherit</code></dt>
+      <dd><b>Sin opini&oacute;n.</b> No se escribe nada y manda el comportamiento por defecto del runtime.</dd>
+      <dt>Subagentes en paralelo / Profundidad</dt>
+      <dd>Cu&aacute;ntos subagentes pueden correr a la vez y hasta qu&eacute; profundidad pueden anidarse. M&aacute;s concurrencia acaba antes y consume m&aacute;s.</dd>
+    </dl>
     <div class="grid2" style="margin-top:10px">
       <div class="field">
-        <label for="maxConcurrency">Max concurrent subagents</label>
+        <label for="maxConcurrency">Subagentes en paralelo</label>
         <input id="maxConcurrency" type="number" min="1" step="1" />
       </div>
       <div class="field">
-        <label for="maxDepth">Max subagent nesting depth</label>
+        <label for="maxDepth">Profundidad m&aacute;xima de anidado</label>
         <input id="maxDepth" type="number" min="1" step="1" />
       </div>
     </div>
@@ -124,17 +164,17 @@ export function renderHtml({ routing, catalog, effortLevels, subagentTypes, mode
 
   <section>
     <div class="section-head">
-      <h2>Model catalog</h2>
-      <button id="refreshCatalog">Refresh</button>
+      <h2>Cat&aacute;logo de modelos</h2>
+      <button id="refreshCatalog">Refrescar</button>
       <span class="status" id="catalogStatus"></span>
     </div>
-    <table><thead><tr><th>Model</th><th>Provider</th><th>Vendor</th><th>Tier</th></tr></thead><tbody id="catalog"></tbody></table>
-    <p class="legend">Read live from this session, so it matches your plan and providers. Tier is relative token cost; <code>byok</code> means it is not billed to the Copilot plan.</p>
+    <table><thead><tr><th>Modelo</th><th>Proveedor</th><th>Fabricante</th><th>Tier</th></tr></thead><tbody id="catalog"></tbody></table>
+    <p class="legend">Le&iacute;do en vivo de esta sesi&oacute;n, as&iacute; que refleja tu plan y tus proveedores reales. <b>Tier</b> es el coste relativo en tokens: <code>low</code> y <code>byok</code> son baratos; <code>high</code> y <code>very_high</code>, caros. <code>byok</code> significa que no se factura al plan de Copilot, sino a tu otro proveedor.</p>
   </section>
 
   <div class="actions">
-    <button class="primary" id="save">Apply routing</button>
-    <button id="reset">Restore defaults</button>
+    <button class="primary" id="save">Aplicar routing</button>
+    <button id="reset">Restaurar por defecto</button>
     <span class="status" id="status"></span>
   </div>
 
@@ -144,7 +184,11 @@ let state = BOOT.routing;
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
-  Object.assign(node, props);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "dataset") Object.assign(node.dataset, value);
+    else if (key === "style" && typeof value === "object") Object.assign(node.style, value);
+    else node[key] = value;
+  }
   for (const child of children) node.append(child);
   return node;
 }
@@ -186,9 +230,9 @@ function policySelect(value, onInput) {
 }
 
 const ROLE_LABELS = {
-  plan: ["Plan", "Architecture, decomposition, hard reasoning."],
-  execute: ["Execute", "Bulk work: search, summarize, mechanical edits."],
-  verify: ["Verify", "Independent cross-check of the workers' output."],
+  plan: ["Planificar", "Arquitectura, descomposici\\u00f3n, razonamiento dif\\u00edcil."],
+  execute: ["Ejecutar", "Trabajo en volumen: buscar, resumir, ediciones mec\\u00e1nicas."],
+  verify: ["Verificar", "Comprobaci\\u00f3n independiente de lo que produjeron los ejecutores."],
 };
 
 function renderRoles() {
@@ -210,9 +254,9 @@ function renderSubagents() {
   const host = document.getElementById("subagents");
   host.replaceChildren();
   host.append(el("div", { className: "row subagent head" }, [
-    el("span", { textContent: "Agent" }),
-    el("span", { textContent: "Model" }),
-    el("span", { textContent: "Effort" }),
+    el("span", { textContent: "Subagente" }),
+    el("span", { textContent: "Modelo" }),
+    el("span", { textContent: "Esfuerzo" }),
     el("span", { textContent: "Enforcement" }),
   ]));
   for (const type of BOOT.subagentTypes) {
@@ -245,8 +289,11 @@ function renderCatalog() {
     }
   }
   const total = BOOT.catalog.providers.reduce((n, group) => n + group.models.length, 0);
+  if (!total) {
+    host.append(el("tr", {}, [el("td", { colSpan: 4, className: "provider", textContent: "No hay modelos disponibles." })]));
+  }
   setCatalogStatus(
-    total + " models, " + BOOT.catalog.providers.length + " provider(s) \\u2014 " + BOOT.catalog.source,
+    total + " modelos, " + BOOT.catalog.providers.length + " proveedor(es) \\u2014 " + BOOT.catalog.source,
     BOOT.catalog.source === "live" ? "ok" : "err"
   );
 }
@@ -275,7 +322,7 @@ async function post(path, body) {
 
 document.getElementById("save").addEventListener("click", async (event) => {
   event.target.disabled = true;
-  setStatus("Applying\\u2026");
+  setStatus("Aplicando\\u2026");
   try {
     const concurrency = Number(document.getElementById("maxConcurrency").value);
     const depth = Number(document.getElementById("maxDepth").value);
@@ -288,7 +335,7 @@ document.getElementById("save").addEventListener("click", async (event) => {
       },
     };
     state = (await post("/routing", patch)).routing;
-    setStatus("Applied", "ok");
+    setStatus("Aplicado", "ok");
   } catch (error) {
     setStatus(String(error.message || error), "err");
   } finally {
@@ -298,12 +345,12 @@ document.getElementById("save").addEventListener("click", async (event) => {
 
 document.getElementById("reset").addEventListener("click", async (event) => {
   event.target.disabled = true;
-  setStatus("Resetting\\u2026");
+  setStatus("Restaurando\\u2026");
   try {
     state = (await post("/reset", {})).routing;
     renderRoles();
     renderSubagents();
-    setStatus("Defaults restored", "ok");
+    setStatus("Valores por defecto restaurados", "ok");
   } catch (error) {
     setStatus(String(error.message || error), "err");
   } finally {
@@ -313,7 +360,7 @@ document.getElementById("reset").addEventListener("click", async (event) => {
 
 document.getElementById("refreshCatalog").addEventListener("click", async (event) => {
   event.target.disabled = true;
-  setCatalogStatus("Refreshing\\u2026");
+  setCatalogStatus("Refrescando\\u2026");
   try {
     const { catalog } = await (await fetch("/catalog?refresh=1")).json();
     BOOT.catalog = catalog;
@@ -331,7 +378,7 @@ const events = new EventSource("/events");events.addEventListener("routing", (ev
   state = JSON.parse(event.data);
   renderRoles();
   renderSubagents();
-  setStatus("Updated elsewhere", "ok");
+  setStatus("Actualizado desde fuera", "ok");
 });
 
 renderRoles();

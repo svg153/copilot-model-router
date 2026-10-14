@@ -8,7 +8,7 @@ premium por culpa de `Auto`.
 
 | Pieza | Qué hace |
 | --- | --- |
-| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. |
+| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
 | Workflow `plan-then-execute` | Un modelo caro planifica, modelos baratos ejecutan en paralelo, un tercer modelo verifica. |
 | Ajustes de subagentes | Se aplican a la sesión viva vía `session.rpc.tools.updateSubagentSettings`. |
@@ -99,8 +99,14 @@ Copia la carpeta `model-router/` dentro de `%USERPROFILE%\.copilot\extensions\`
 ## Uso
 
 Abre el panel **Model Router** desde el canvas, cambia lo que quieras y pulsa
-**Apply routing**. Se guarda en `artifacts/routing.json` dentro de la carpeta de la
-extensión y se aplica inmediatamente a la sesión.
+**Aplicar routing**. Se guarda en `artifacts/routing.json` dentro de la carpeta de la
+extensión y se aplica inmediatamente a la sesión. **Restaurar por defecto** vuelve a los
+valores de fábrica.
+
+El panel se explica solo: la sección **Cómo funciona** resume qué es cada apartado y qué
+afecta, y debajo de **Roles del workflow** y **Subagentes fijados** hay una lista con el
+significado de *Effort* (presupuesto de razonamiento del modelo) y de cada valor de
+*Enforcement* (`required` / `preferred` / `inherit`).
 
 Para el flujo caro/barato, invoca el workflow:
 
