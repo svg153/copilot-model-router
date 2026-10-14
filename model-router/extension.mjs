@@ -11,8 +11,12 @@
 // so it is user-global and inspectable on disk.
 
 import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { joinSession, createCanvas } from "@github/copilot-sdk/extension";
 import {
+    ARTIFACT_DIR,
     BUILTIN_SUBAGENT_TYPES,
     DEFAULT_PROVIDER_LABELS,
     EFFORT_LEVELS,
@@ -25,10 +29,25 @@ import {
     saveRouting,
     toSubagentSettings,
 } from "./routing.mjs";
+import {
+    SNAPSHOT_REPO,
+    SNAPSHOT_URL,
+    benchmarkRows,
+    loadEnrichment,
+    resetEnrichmentCache,
+} from "./enrichment.mjs";
 import { renderHtml } from "./renderer.mjs";
 import { planThenExecute } from "./workflow.mjs";
 
 const MAX_BODY_BYTES = 256 * 1024;
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** Bundled third-party assets (three.js), served to the 3D tab. See vendor/README.md. */
+const VENDOR_DIR = join(HERE, "vendor");
+
+/** Machine-local copy of the downloaded snapshot, so the TTL survives restarts. */
+const ENRICHMENT_CACHE_FILE = join(ARTIFACT_DIR, "models-enriched.cache.json");
 
 /** One loopback server per open canvas instance: instanceId -> { server, url, clients } */
 const servers = new Map();
@@ -92,25 +111,36 @@ function broadcastRouting(entry, routing) {
  * the user's plan and providers actually expose rather than a list maintained in
  * this repo. Cached because the underlying call reaches out to CAPI; falls back
  * to a small static list when the call fails (no auth, older runtime).
+ *
+ * Public metadata (vendor, per-token price, benchmarks) is joined on from the
+ * snapshot; see enrichment.mjs for where that comes from and how it degrades.
  */
 const CATALOG_TTL_MS = 60_000;
 const catalogCache = { value: null, at: 0 };
 
-async function fetchCatalog(session, { refresh = false, providerLabels } = {}) {
+async function fetchCatalog(session, { refresh = false, providerLabels, refreshData = false } = {}) {
     const labels = providerLabels ?? DEFAULT_PROVIDER_LABELS;
     const now = Date.now();
-    if (!refresh && catalogCache.value && now - catalogCache.at < CATALOG_TTL_MS) {
+    if (!refresh && !refreshData && catalogCache.value && now - catalogCache.at < CATALOG_TTL_MS) {
         return catalogCache.value;
     }
 
+    if (refreshData) resetEnrichmentCache();
+    const enrichment = await loadEnrichment({
+        force: refreshData,
+        cacheFile: ENRICHMENT_CACHE_FILE,
+    });
+
     try {
-        const modelList = await session.rpc.model.list({ skipCache: refresh });
-        const providers = normalizeCatalog(modelList, labels);
+        const modelList = await session.rpc.model.list({ skipCache: refresh || refreshData });
+        const providers = normalizeCatalog(modelList, labels, enrichment);
         if (!providers.length) throw new Error("the session returned an empty model list");
         catalogCache.value = {
             providers,
             source: "live",
             fetchedAt: new Date(now).toISOString(),
+            data: enrichment.meta,
+            dataSource: enrichment.source,
         };
     } catch (error) {
         await session.log(
@@ -122,11 +152,35 @@ async function fetchCatalog(session, { refresh = false, providerLabels } = {}) {
             providers: buildFallbackCatalog(labels),
             source: "fallback",
             fetchedAt: new Date(now).toISOString(),
+            data: enrichment.meta,
+            dataSource: enrichment.source,
         };
     }
 
     catalogCache.at = now;
     return catalogCache.value;
+}
+
+/** The public benchmark leaderboard the canvas's Benchmarks tab renders. */
+const benchmarkCache = { value: null, at: 0 };
+
+async function fetchBenchmarks({ refresh = false } = {}) {
+    const now = Date.now();
+    if (!refresh && benchmarkCache.value && now - benchmarkCache.at < CATALOG_TTL_MS) {
+        return benchmarkCache.value;
+    }
+    if (refresh) resetEnrichmentCache();
+
+    const enrichment = await loadEnrichment({ force: refresh, cacheFile: ENRICHMENT_CACHE_FILE });
+    benchmarkCache.value = {
+        rows: benchmarkRows(enrichment.snapshot),
+        meta: enrichment.meta,
+        source: enrichment.source,
+        repoUrl: `https://github.com/${SNAPSHOT_REPO}`,
+        snapshotUrl: SNAPSHOT_URL,
+    };
+    benchmarkCache.at = now;
+    return benchmarkCache.value;
 }
 
 async function startServer(session) {
@@ -162,15 +216,44 @@ async function startServer(session) {
             return;
         }
 
+        if (req.method === "GET" && url.pathname === "/data") {
+            sendJson(
+                res,
+                200,
+                await fetchBenchmarks({ refresh: url.searchParams.get("refresh") === "1" })
+            );
+            return;
+        }
+
         if (req.method === "POST" && (url.pathname === "/routing" || url.pathname === "/reset")) {
             try {
                 const isReset = url.pathname === "/reset";
                 const routing = isReset ? await resetRouting() : await saveRouting(await readBody(req));
                 broadcastRouting(entry, routing);
-                await applySubagentSettings(session, routing);
-                sendJson(res, 200, { routing });
+                const applied = await applySubagentSettings(session, routing);
+                sendJson(res, 200, { routing, applied });
             } catch (error) {
                 sendJson(res, 400, { error: String(error?.message ?? error) });
+            }
+            return;
+        }
+
+        if (req.method === "GET" && url.pathname.startsWith("/vendor/")) {
+            const name = url.pathname.slice("/vendor/".length);
+            // Basename only, .js only: never let a request walk out of vendor/.
+            if (!/^[A-Za-z0-9._-]+\.js$/.test(name) || name.includes("..")) {
+                sendJson(res, 404, { error: "not found" });
+                return;
+            }
+            try {
+                const source = await readFile(join(VENDOR_DIR, name));
+                res.writeHead(200, {
+                    "Content-Type": "text/javascript; charset=utf-8",
+                    "Cache-Control": "public, max-age=86400",
+                });
+                res.end(source);
+            } catch {
+                sendJson(res, 404, { error: `${name} is not bundled` });
             }
             return;
         }
@@ -178,11 +261,13 @@ async function startServer(session) {
         if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
             const routing = await loadRouting();
             const catalog = await fetchCatalog(session, { providerLabels: routing.providerLabels });
+            const benchmarks = await fetchBenchmarks();
             res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
             res.end(
                 renderHtml({
                     routing,
                     catalog,
+                    benchmarks,
                     effortLevels: EFFORT_LEVELS,
                     subagentTypes: BUILTIN_SUBAGENT_TYPES,
                     modelPolicies: MODEL_POLICIES,
@@ -255,6 +340,37 @@ const session = await joinSession({
                             refresh: ctx.input?.refresh === true,
                             providerLabels: routing.providerLabels,
                         });
+                    },
+                },
+                {
+                    name: "get_benchmarks",
+                    description:
+                        "Public benchmark scores (reasoning, coding, agent, latency) for models, with vendor and price.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            refresh: {
+                                type: "boolean",
+                                description: "Re-download the snapshot instead of using the cached one.",
+                            },
+                        },
+                    },
+                    handler: async (ctx) => await fetchBenchmarks({ refresh: ctx.input?.refresh === true }),
+                },
+                {
+                    name: "refresh_data",
+                    description:
+                        "Re-download the public model metadata snapshot and re-read the live model catalog.",
+                    handler: async () => {
+                        const routing = await loadRouting();
+                        const [catalog, benchmarks] = await Promise.all([
+                            fetchCatalog(session, {
+                                refreshData: true,
+                                providerLabels: routing.providerLabels,
+                            }),
+                            fetchBenchmarks({ refresh: true }),
+                        ]);
+                        return { catalog, benchmarks };
                     },
                 },
                 {

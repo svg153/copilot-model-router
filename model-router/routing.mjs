@@ -6,6 +6,7 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
+import { applyEnrichment } from "./enrichment.mjs";
 
 export const COPILOT_HOME = process.env.COPILOT_HOME || join(homedir(), ".copilot");
 export const ARTIFACT_DIR = join(COPILOT_HOME, "extensions", "model-router", "artifacts");
@@ -87,8 +88,12 @@ export function buildFallbackCatalog(providerLabels = DEFAULT_PROVIDER_LABELS) {
  * plan (or a provider added to the machine) shows up without touching this file.
  * BYOK models are recognized by the `provider/model` id shape the runtime gives
  * them, so no provider id has to be maintained either.
+ *
+ * `enrichment` is the public snapshot loaded by enrichment.mjs. It only fills
+ * gaps the runtime leaves — notably the vendor and per-token price of a BYOK
+ * model — so passing null simply yields the runtime's own view.
  */
-export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LABELS) {
+export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LABELS, enrichment = null) {
     const entries = Array.isArray(modelList?.list) ? modelList.list : [];
     const prices = new Map(
         (Array.isArray(modelList?.modelPriceCategories) ? modelList.modelPriceCategories : [])
@@ -126,7 +131,7 @@ export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LA
             groups.set(providerId, group);
         }
 
-        group.models.push({
+        const base = {
             id: entry.id,
             // A BYOK entry reports its own provider-qualified id as the display
             // name, so use the model half of the id instead.
@@ -134,12 +139,18 @@ export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LA
             vendor: entry.vendor || null,
             // Prefer the per-model field: the price-category map omits some
             // models (HydraFusion among them). A BYOK model is not metered
-            // against the Copilot plan and reports neither.
+            // against the Copilot plan and reports neither, so the snapshot's
+            // inferred tier is what fills that in.
             tier:
                 entry.model_picker_price_category ||
                 prices.get(entry.id) ||
                 (isByok ? "byok" : "unknown"),
-        });
+            external: isByok,
+        };
+
+        group.models.push(
+            enrichment?.index ? applyEnrichment(base, enrichment.index) : base
+        );
     }
 
     const providers = [...groups.values()].sort(
@@ -248,7 +259,7 @@ export function policyProse(routing, catalog = []) {
     const expensive = expensiveModelIds(catalog);
     const free = catalog
         .flatMap((group) => group.models)
-        .filter((model) => model.tier === "byok")
+        .filter((model) => model.external && !EXPENSIVE_TIERS.has(model.tier))
         .map((model) => model.id);
 
     const budget = [];
@@ -259,7 +270,8 @@ export function policyProse(routing, catalog = []) {
     }
     if (free.length) {
         budget.push(
-            `These models cost nothing on the second provider, so prefer them for bulk work: ${free.join(", ")}.`
+            `These models come from the second provider and are not billed against the Copilot plan, ` +
+                `so prefer them for bulk work: ${free.join(", ")}.`
         );
     }
 

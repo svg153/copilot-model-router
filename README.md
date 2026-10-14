@@ -10,9 +10,12 @@ premium por culpa de `Auto`.
 | --- | --- |
 | Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
+| Pestaña **Comparativa** | Ranking de benchmarks públicos, gráfico calidad/precio y una recomendación por tipo de subagente, con el peso de calidad, coste y velocidad de cada rol. |
+| Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos: calidad, precio y velocidad. Solo se carga al abrir la pestaña. |
 | Workflow `plan-then-execute` | Un modelo caro planifica, modelos baratos ejecutan en paralelo, un tercer modelo verifica. |
 | Ajustes de subagentes | Se aplican a la sesión viva vía `session.rpc.tools.updateSubagentSettings`. |
 | Bloque de política | Al iniciar sesión se inyecta `<model-routing-policy>` para que el agente enrute a propósito. |
+| Instantánea de datos | `model-router/data/models-enriched.json`: fabricante, precio, notas de benchmark y velocidad de 371 modelos, regenerada cada semana por un GitHub Action. |
 
 ## Reparto por defecto
 
@@ -72,6 +75,65 @@ proveedor externo con el nombre y el coste que ve la propia app.
 El bloque de política que se inyecta en la sesión se construye con ese mismo catálogo,
 así que nombra explícitamente los modelos caros que conviene evitar y los gratuitos que
 conviene usar para trabajo masivo.
+
+### Fabricante, precio y notas de benchmark
+
+El runtime no siempre dice quién fabrica un modelo, y no publica notas de calidad. Esos
+datos se resuelven en cascada, de más fiable a menos:
+
+1. **Runtime** — si el modelo trae fabricante propio, se usa ese.
+2. **Instantánea pública** (`model-router/data/models-enriched.json`) — cruce por id
+   normalizado (`glm5.3-flash` → `glm53flash`), con `aliases` para los nombres alternativos.
+3. **Familia** — si el id exacto no está, se busca por prefijo (`qwen3.6` → `qwen3.8-flash`)
+   y solo se aceptan los campos en los que **todos** los candidatos coinciden.
+4. **Heurística sobre el id** — último recurso: `glm` → Z.ai, `mimo` → Xiaomi,
+   `deepseek` → DeepSeek, `kimi`/`moonshot` → Moonshot AI, `hydrafusion` → GitHub Copilot, etc.
+
+Los modelos de Copilot que no son públicos (`hydrafusion-max`, `mai-code-1.1-flash`) se
+quedan en el paso 1 o 4, porque no aparecen en ninguna fuente abierta.
+
+### De dónde salen los benchmarks
+
+`scripts/build-data.mjs` cruza tres fuentes públicas y sin clave, y escribe la instantánea:
+
+| Fuente | Aporta |
+| --- | --- |
+| [`models.dev/api.json`](https://models.dev/api.json) | Fabricante, familia, contexto, capacidades y precio de API. Se filtra a los proveedores creadores: de ~8.800 entradas quedan 371 modelos. |
+| [`jeinlee1991/chinese-llm-benchmark`](https://github.com/jeinlee1991/chinese-llm-benchmark) | Notas reales de razonamiento, código, agentes, `TAU` y `Terminal-Bench`. Es la fuente de calidad. |
+| [`verseles/showdown`](https://github.com/verseles/showdown) | Velocidad de salida y latencia del primer token. Se usa como contraste y para completar familias. |
+
+Resultado: **371 modelos, 371 con fabricante, 331 con precio, 88 con benchmarks y 57 con
+velocidad**. La instantánea pesa ~213 KB y va dentro de la extensión, así que el panel
+funciona sin red; si el fichero tiene más de una semana, se intenta descargar el más
+reciente y se cachea en `artifacts/`.
+
+> No hay ninguna API pública y sin clave que devuelva notas de calidad: LMArena responde
+> 403, Artificial Analysis 401 y el dataset de HuggingFace está restringido. Por eso el
+> ranking se construye con un repositorio mantenido en GitHub en lugar de consultarse en vivo.
+
+### Cómo se calcula la recomendación
+
+Cada rol (`explore`, `task`, `code-review`, `research`, `security-review`) tiene sus
+propios benchmarks y sus propios pesos. La calidad se normaliza **por benchmark** contra
+los 88 modelos del ranking público, así que 100 es el mejor medido y 0 el peor, y un
+modelo solo se compara con otros que reportan la misma métrica. El coste entra como
+categoría de precio del plan (o como precio de API en los modelos de clave propia) y la
+velocidad como tokens por segundo.
+
+Un modelo sin benchmarks **no** recibe una ventaja: se le asigna la media de los medidos,
+y la tarjeta lo avisa. Sin eso, cualquier modelo barato sin datos ganaba todas las
+recomendaciones por el simple hecho de no tener nada que lo penalizara.
+
+### Actualización automática
+
+`.github/workflows/refresh-data.yml` regenera la instantánea los lunes a las 05:17 UTC,
+cuando cambia `scripts/build-data.mjs`, y a mano con *Run workflow*. Si el resultado es
+idéntico al anterior no hace commit. Como el script conserva el `generatedAt` cuando nada
+más cambia, dos ejecuciones seguidas producen un fichero byte a byte igual.
+
+```bash
+node scripts/build-data.mjs   # regenerar en local
+```
 
 ## Instalación
 
@@ -185,6 +247,15 @@ setx MODEL_ROUTER_PROVIDER_LABEL "Nombre visible"
 - Con `modelPolicy: "required"`, si el proveedor externo no está disponible el
   subagente falla en lugar de caer a un modelo premium. Cambia a `"preferred"` si
   prefieres degradar en vez de fallar.
+- Las notas de benchmark son de terceros y **no** están alineadas con los precios del
+  plan: sirven para ordenar modelos entre sí, no para predecir tu factura. En los
+  modelos de Copilot, el precio que se muestra es el de API de referencia, no lo que
+  te cobra la suscripción.
+- `model-router/vendor/` lleva three.js 0.180.0 empaquetado para que la pestaña 3D
+  funcione sin red. El build de módulos reexporta desde `three.core.min.js`, así que
+  hacen falta los dos ficheros y se sirven desde el propio servidor local del panel.
+- `model-router/data/models-enriched.json` es la instantánea que se commitea. No la
+  añadas a `.gitignore`: es el respaldo que hace que el panel funcione recién instalado.
 
 ## Dónde aplica
 
