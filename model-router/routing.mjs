@@ -49,6 +49,22 @@ export const DEFAULT_PROVIDER_LABELS = {
 };
 
 /**
+ * A bring-your-own-key provider usually reports its own opaque id (a UUID or a
+ * hostname) as the label. Showing that verbatim in the panel is unreadable, so
+ * shorten it and mark it as unlabelled; the user can give it a real name in
+ * providerLabels.
+ */
+export function fallbackProviderLabel(providerId) {
+    const id = String(providerId ?? "").trim();
+    if (!id) return "Proveedor externo";
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+        return `Proveedor externo ${id.slice(0, 8)}`;
+    }
+    if (id.length > 28) return `Proveedor externo ${id.slice(0, 12)}…`;
+    return id;
+}
+
+/**
  * The catalog is fetched live from the session (see normalizeCatalog). This is
  * only what the canvas shows when that call fails — a session without auth, or
  * an older runtime — so the panel still renders something useful.
@@ -68,7 +84,7 @@ export function buildFallbackCatalog(providerLabels = DEFAULT_PROVIDER_LABELS) {
         if (!group) {
             group = {
                 id: providerId,
-                label: providerLabels[providerId] || providerId,
+                label: providerLabels[providerId] || (providerId === "copilot" ? "GitHub Copilot" : fallbackProviderLabel(providerId)),
                 ordering: slash > 0 ? 1 : 0,
                 models: [],
             };
@@ -124,7 +140,7 @@ export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LA
                 label:
                     descriptor?.label ||
                     providerLabels[providerId] ||
-                    (isByok ? providerId : "GitHub Copilot"),
+                    (isByok ? fallbackProviderLabel(providerId) : "GitHub Copilot"),
                 ordering: descriptor?.ordering ?? (isByok ? 1 : 0),
                 models: [],
             };
@@ -227,9 +243,87 @@ export const DEFAULT_ROUTING = {
     },
 };
 
+/**
+ * Rough ordering by what this machine actually pays: external models by their
+ * reference API price, Copilot models by their price category. Copilot models
+ * are pushed behind any priced external model on purpose, because Copilot
+ * billing is quota-based rather than per-token.
+ */
+const TIER_CHEAPNESS = { low: 0, byok: 0, medium: 1, high: 2, very_high: 3 };
+
+function cheapness(model) {
+    if (model.external && typeof model.blendedCost === "number") return model.blendedCost;
+    const rank = TIER_CHEAPNESS[model.tier];
+    return typeof rank === "number" ? 10 + rank * 10 : 999;
+}
+
+let defaultCatalogLoader = null;
+
+/** Lets the extension supply the detected catalog, so first-run defaults can be derived from it. */
+export function setDefaultCatalogLoader(fn) {
+    defaultCatalogLoader = typeof fn === "function" ? fn : null;
+}
+
+async function detectedCatalog() {
+    if (!defaultCatalogLoader) return [];
+    try {
+        return await defaultCatalogLoader();
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * First-run defaults derived from whatever catalog this machine actually has, so
+ * a fresh install sends bulk work to the cheapest model it can see instead of a
+ * hardcoded one, and planning to the best-scoring Copilot model it can see.
+ * Falls back to DEFAULT_ROUTING when there is no catalog to choose from.
+ *
+ * This is what keeps the published defaults free of any personal provider id or
+ * model name: they are resolved from the machine, not from the repository.
+ */
+export function defaultRoutingFor(catalog = []) {
+    const models = catalog.flatMap((group) => group.models ?? []);
+    if (!models.length) return DEFAULT_ROUTING;
+
+    const ranked = [...models].sort((a, b) => cheapness(a) - cheapness(b));
+    const execute = ranked[0].id;
+    const verifyRow =
+        ranked.find((model) => model.id !== execute && model.bench?.total) ??
+        ranked.find((model) => model.id !== execute) ??
+        ranked[0];
+
+    const byQuality = models
+        .filter((model) => !model.external && typeof model.bench?.total === "number")
+        .sort((a, b) => b.bench.total - a.bench.total);
+    const planRow = byQuality[0] ?? models.find((model) => EXPENSIVE_TIERS.has(model.tier)) ?? models[0];
+
+    return {
+        ...DEFAULT_ROUTING,
+        roles: {
+            plan: { model: planRow.id, effort: "high" },
+            execute: { model: execute, effort: "low" },
+            verify: { model: verifyRow.id, effort: "medium" },
+        },
+        subagents: {
+            ...DEFAULT_ROUTING.subagents,
+            agents: Object.fromEntries(
+                BUILTIN_SUBAGENT_TYPES.map((type) => [
+                    type,
+                    {
+                        model: execute,
+                        effortLevel: "low",
+                        contextTier: "inherit",
+                        modelPolicy: "required",
+                    },
+                ])
+            ),
+        },
+    };
+}
+
 /** Human-readable policy injected into the session so the agent routes deliberately. */
-export function policyProse(routing, catalog = []) {
-    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
+export function policyProse(routing, catalog = []) {    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
         type,
         entry: routing.subagents?.agents?.[type],
     })).filter(({ entry }) => entry?.model);
@@ -358,8 +452,9 @@ export async function loadRouting() {
         const raw = await readFile(ROUTING_FILE, "utf8");
         return mergeRouting(DEFAULT_ROUTING, JSON.parse(raw), { replaceAgentEntries: true });
     } catch {
-        // Missing or corrupt config falls back to defaults rather than failing a run.
-        return mergeRouting(DEFAULT_ROUTING, null);
+        // Missing or corrupt config falls back to catalog-derived defaults rather
+        // than failing a run.
+        return mergeRouting(defaultRoutingFor(await detectedCatalog()), null);
     }
 }
 
@@ -373,9 +468,10 @@ export async function saveRouting(patch) {
 }
 
 export async function resetRouting() {
+    const defaults = defaultRoutingFor(await detectedCatalog());
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
-    await writeFile(ROUTING_FILE, `${JSON.stringify(DEFAULT_ROUTING, null, 2)}\n`, "utf8");
-    return mergeRouting(DEFAULT_ROUTING, null);
+    await writeFile(ROUTING_FILE, `${JSON.stringify(defaults, null, 2)}\n`, "utf8");
+    return mergeRouting(defaults, null);
 }
 
 /**

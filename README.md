@@ -10,8 +10,8 @@ premium por culpa de `Auto`.
 | --- | --- |
 | Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
-| Pestaña **Comparativa** | Ranking de benchmarks públicos, gráfico calidad/precio y una recomendación por tipo de subagente, con el peso de calidad, coste y velocidad de cada rol. |
-| Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos: calidad, precio y velocidad. Solo se carga al abrir la pestaña. |
+| Pestaña **Comparativa** | Ranking de benchmarks públicos, gráfico calidad/precio, una recomendación por tipo de subagente y **filtros por proveedor y por modelo**. |
+| Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos (calidad, precio y velocidad) con marco de referencia, rejilla y etiquetas de eje. Solo se carga al abrir la pestaña. |
 | Workflow `plan-then-execute` | Un modelo caro planifica, modelos baratos ejecutan en paralelo, un tercer modelo verifica. |
 | Ajustes de subagentes | Se aplican a la sesión viva vía `session.rpc.tools.updateSubagentSettings`. |
 | Bloque de política | Al iniciar sesión se inyecta `<model-routing-policy>` para que el agente enrute a propósito. |
@@ -19,15 +19,25 @@ premium por culpa de `Auto`.
 
 ## Reparto por defecto
 
-| Rol | Modelo | Esfuerzo |
+En una instalación nueva, los valores iniciales **no están escritos a mano**: se derivan
+del catálogo que detecte tu sesión.
+
+| Rol | Regla | Ejemplo |
 | --- | --- | --- |
-| Planificar | `claude-opus-5.5` | high |
-| Ejecutar | `<proveedor>/deepseek-v4-flash` | low |
-| Verificar | `<proveedor>/qwen3.6` | medium |
+| Planificar | el modelo de Copilot con mejor nota pública (si no hay notas, el primero de gama alta) | `claude-opus-5.5` |
+| Ejecutar | el modelo más barato disponible, con esfuerzo `low` | `<proveedor>/mimo-v2.6-flash` |
+| Verificar | el segundo más barato, con esfuerzo `medium` | `<proveedor>/glm5.3-flash` |
 
 Los seis subagentes integrados (`explore`, `task`, `general-purpose`, `code-review`,
-`research`, `security-review`) se fijan al modelo barato con `contextTier: inherit` y
-`modelPolicy: "required"`.
+`research`, `security-review`) se fijan al modelo de ejecución con `contextTier: inherit`
+y `modelPolicy: "required"`.
+
+Así el repositorio público no lleva ningún id de proveedor ni ningún nombre de empresa:
+cada máquina se configura con lo que tenga delante. Si el catálogo no se puede leer, se
+usa una lista mínima de reserva (`claude-opus-5.5` / `claude-haiku-5.5` / `gpt-5.4-mini`).
+
+> **Restaurar por defecto** sobrescribe la configuración guardada con esos valores
+> derivados del catálogo, así que **pierdes las fijaciones que hayas afinado a mano**.
 
 ### Columna *Enforcement*
 
@@ -134,6 +144,36 @@ más cambia, dos ejecuciones seguidas producen un fichero byte a byte igual.
 ```bash
 node scripts/build-data.mjs   # regenerar en local
 ```
+
+### Filtro por proveedor y selección de modelos
+
+La pestaña **Comparativa** tiene una barra de filtros que afecta a las seis tarjetas de
+recomendación, al gráfico, a la tabla y a la leyenda del 3D:
+
+| Control | Efecto |
+| --- | --- |
+| **Proveedor** | Deja solo los modelos de ese proveedor. Sirve para responder a la pregunta *"con lo que ya pago, ¿qué me conviene para cada tarea?"*. |
+| **Modelos** | Al pulsar un modelo se quita de la lista; el primer clic siembra la selección con todo lo visible, así que **desmarcas lo que no quieres** en lugar de quedarte con uno solo. |
+| **Ninguno** | Vacía la selección y las tarjetas quedan sin recomendación. |
+| **Solo mis modelos en la tabla** | Deja en la tabla únicamente las filas de los modelos que tienes disponibles. |
+| **Quitar filtros** | Vuelve a los 37 modelos del catálogo. |
+
+Cuando hay un filtro activo aparece un aviso sobre el panel de enrutado, para que no se
+confunda una recomendación filtrada con la recomendación global. Las notas de calidad se
+siguen normalizando contra los 88 modelos del ranking público: el filtro cambia **qué**
+modelos compiten, no la escala.
+
+### Pestaña 3D
+
+Cada modelo medido es una esfera: **X** es el precio en escala logarítmica, **Y** la nota
+global y **Z** la velocidad en tokens por segundo. El color es el fabricante, el tamaño
+la nota global, y las esferas con **halo** son los modelos que tienes disponibles ahora
+mismo. Los que quedan fuera del filtro se atenúan.
+
+Para que girar la escena no te deje sin referencias, el mapa lleva un **marco de
+referencia** fijo: una caja que envuelve los datos, una rejilla en el suelo, tres flechas
+de eje y nueve etiquetas que siempre miran a la cámara con el valor de cada extremo.
+**Reencuadrar** vuelve a la vista inicial y **Girar solo** rota automáticamente.
 
 ## Instalación
 
@@ -256,6 +296,10 @@ setx MODEL_ROUTER_PROVIDER_LABEL "Nombre visible"
   hacen falta los dos ficheros y se sirven desde el propio servidor local del panel.
 - `model-router/data/models-enriched.json` es la instantánea que se commitea. No la
   añadas a `.gitignore`: es el respaldo que hace que el panel funcione recién instalado.
+- El repositorio **no** contiene ningún id de proveedor, ningún nombre comercial ni tu
+  login. El nombre visible de un proveedor externo se guarda solo en tu máquina
+  (`artifacts/routing.json`); si no le pones uno, el panel lo llama
+  *"Proveedor externo &lt;prefijo&gt;"* en lugar de mostrar el identificador crudo.
 
 ## Dónde aplica
 

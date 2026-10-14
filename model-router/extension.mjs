@@ -27,6 +27,7 @@ import {
     policyProse,
     resetRouting,
     saveRouting,
+    setDefaultCatalogLoader,
     toSubagentSettings,
 } from "./routing.mjs";
 import {
@@ -429,6 +430,10 @@ const session = await joinSession({
 
 // onSessionStart only fires on start/resume, so apply once at load time too —
 // that covers an extension loaded into an already-running session.
+//
+// Registered before the first loadRouting() so a machine with no saved config
+// derives its defaults from the catalog it actually has.
+setDefaultCatalogLoader(async () => (await fetchCatalog(session, {})).providers);
 const initialRouting = await loadRouting();
 await applySubagentSettings(session, initialRouting);
 const initialCatalog = await fetchCatalog(session, {

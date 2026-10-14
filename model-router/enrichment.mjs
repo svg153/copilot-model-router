@@ -156,6 +156,9 @@ export function applyEnrichment(model, index) {
 
     return {
         ...model,
+        // The normalized key the benchmark snapshot uses, so the client can match
+        // a catalog model against a public leaderboard row without guessing.
+        key: normalizeKey(model.id),
         vendor,
         // How the vendor was established, so the UI can be honest about guesses.
         vendorSource: model.vendor

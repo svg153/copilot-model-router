@@ -157,6 +157,48 @@ dl.defs dd { margin: 2px 0 0; color: var(--text-color-muted, #59636e); }
     color: var(--text-color-muted, #59636e); font-size: 12px;
 }
 .scrollx { overflow-x: auto; }
+.empty-row td {
+    padding: 16px 10px; color: var(--text-color-muted, #59636e);
+    font-style: italic; text-align: center;
+}
+
+.filters {
+    display: grid; gap: 10px; margin-bottom: 18px; padding: 12px;
+    border: 1px solid var(--border-color-default, #d1d9e0); border-radius: 8px;
+    background: var(--background-color-muted, #f6f8fa);
+}
+.filters-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.filters-label {
+    min-width: 78px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-color-muted, #59636e); font-weight: var(--font-weight-semibold, 600);
+}
+.toggle {
+    padding: 2px 9px; border-radius: 12px; font-size: 11px; line-height: 18px; cursor: pointer;
+    border: 1px solid var(--border-color-default, #d1d9e0);
+    background: var(--background-color-default, #ffffff); color: var(--text-color-default, #1f2328);
+}
+.toggle:hover { border-color: var(--color-focus-outline, #0969da); }
+.toggle[aria-pressed="true"] {
+    background: var(--color-focus-outline, #0969da);
+    border-color: var(--color-focus-outline, #0969da); color: #ffffff;
+}
+.toggle[aria-pressed="false"] { opacity: .5; }
+.toggle .swatch {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px; vertical-align: middle; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+}
+.banner {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px;
+    padding: 6px 10px; border-left: 3px solid var(--color-focus-outline, #0969da);
+    border-radius: 0 6px 6px 0; font-size: 12px;
+    background: var(--background-color-muted, #f6f8fa);
+}
+.axis-key { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; font-size: 11px; color: var(--text-color-muted, #59636e); }
+.axis-key b { font-weight: var(--font-weight-semibold, 600); color: var(--text-color-default, #1f2328); }
+.axis-key .swatch {
+    display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+    margin-right: 5px; vertical-align: middle;
+}
 `;
 
 const BODY = `
@@ -184,6 +226,7 @@ const BODY = `
 </nav>
 
 <section class="panel" data-panel="routing" data-active="true">
+  <div class="banner" id="filterBanner" style="display:none"></div>
   <div class="section">
     <h2>Roles del workflow</h2>
     <p class="sub">
@@ -238,6 +281,22 @@ const BODY = `
       ganaba por barato, lo cual no era información, era ruido. Cuando el ganador no tiene datos se avisa en
       la propia tarjeta.
     </p>
+    <div class="filters">
+      <div class="filters-row">
+        <span class="filters-label">Proveedor</span>
+        <span id="providerFilter"></span>
+      </div>
+      <div class="filters-row">
+        <span class="filters-label">Modelos</span>
+        <span id="modelFilter"></span>
+      </div>
+      <div class="filters-row">
+        <span class="filters-label">Atajos</span>
+        <span id="filterActions"></span>
+      </div>
+      <div class="note" id="filterNote" style="margin:0"></div>
+    </div>
+
     <div class="cards" id="recs"></div>
   </div>
 
@@ -279,19 +338,31 @@ const BODY = `
       Es la misma información que la pestaña Comparativa, pero vista como un terreno: se entiende de un vistazo
       dónde está la frontera buena y barata.
     </p>
+    <div class="bar-top" style="margin-bottom:10px">
+      <button id="sceneReset">Reencuadrar</button>
+      <button id="sceneSpin" aria-pressed="false">Girar solo</button>
+      <span id="sceneStatus" class="status"></span>
+    </div>
     <div class="scene" id="scene3d"><div class="tip" id="sceneTip"></div></div>
+    <div class="axis-key" id="sceneAxes"></div>
     <div class="legend" id="sceneLegend"></div>
     <dl class="defs">
       <dt>Eje horizontal (x)</dt>
-      <dd>Precio. A la izquierda lo barato, a la derecha lo caro. La escala es logarítmica, porque las diferencias de precio son enormes.</dd>
+      <dd>Precio. A la izquierda lo barato, a la derecha lo caro. La escala es logarítmica, porque las diferencias de precio son enormes. Se marca en <b>ámbar</b>.</dd>
       <dt>Eje vertical (y)</dt>
-      <dd>Nota global del benchmark. Arriba los mejores.</dd>
+      <dd>Nota global del benchmark. Arriba los mejores. Se marca en <b>verde</b>.</dd>
       <dt>Profundidad (z)</dt>
-      <dd>Velocidad de salida, en tokens por segundo. Delante lo rápido, detrás lo lento.</dd>
+      <dd>Velocidad de salida, en tokens por segundo. Delante lo rápido, detrás lo lento. Se marca en <b>azul</b>.</dd>
+      <dt>Marco de referencia</dt>
+      <dd>
+        La caja, la rejilla del suelo y las tres flechas giran junto con las esferas, y los rótulos de los
+        extremos siempre miran a la cámara. Así no pierdes la orientación por mucho que gires: cada flecha
+        lleva escrito qué mide y en qué sentido crece, con los valores en los dos extremos.
+      </dd>
       <dt>Tamaño de la esfera</dt>
       <dd>Nota global: cuanto más grande, mejor.</dd>
       <dt>Color</dt>
-      <dd>Fabricante. Las esferas con anillo son los modelos que tienes disponibles ahora mismo.</dd>
+      <dd>Fabricante. Las esferas con halo son los modelos que tienes disponibles ahora mismo.</dd>
     </dl>
   </div>
 </section>
@@ -375,6 +446,10 @@ var modelPolicies = BOOT.modelPolicies || [];
 var dirty = false;
 var selectedId = null;
 var benchSort = { key: "total", dir: -1 };
+// Which models the recommendations, the chart and the 3D view are allowed to
+// use. "picked" is keyed by the snapshot's normalised id and null means "all".
+var filters = { provider: "all", picked: null };
+var benchOnlyMine = false;
 
 var SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -393,6 +468,13 @@ function el(tag, props, children) {
       var value = props[key];
       if (value === undefined || value === null) return;
       if (key === "dataset") { Object.assign(node.dataset, value); return; }
+      if (key === "attrs") {
+        Object.keys(value).forEach(function (name) {
+          if (value[name] === undefined || value[name] === null) return;
+          node.setAttribute(name, String(value[name]));
+        });
+        return;
+      }
       if (key === "style" && typeof value === "object") { Object.assign(node.style, value); return; }
       if (key === "text") { node.textContent = value; return; }
       node[key] = value;
@@ -479,11 +561,53 @@ function vendorOf(model) {
   return model.vendor || VENDOR_FALLBACK;
 }
 
-function vendorColor(vendor) {
+/**
+ * A curated hue per known vendor, so two vendors never land on the same colour
+ * by accident. Anything unknown falls back to a golden-angle spread of its own
+ * hash, which keeps neighbours far apart instead of clustering in the greens.
+ */
+var VENDOR_HUES = {
+  Anthropic: 24, OpenAI: 158, Google: 210, Alibaba: 275, DeepSeek: 195,
+  "Z.ai": 340, Xiaomi: 42, "Moonshot AI": 302, ByteDance: 175, Tencent: 228,
+  xAI: 0, Baidu: 252, MiniMax: 315, Meta: 205, Microsoft: 190, Mistral: 30,
+  Cohere: 285, Perplexity: 165, StepFun: 120, NVIDIA: 95, Amazon: 62,
+  "GitHub Copilot": 265, AI21: 350
+};
+
+function vendorHue(vendor) {
   var key = String(vendor || "?");
+  if (Object.prototype.hasOwnProperty.call(VENDOR_HUES, key)) return VENDOR_HUES[key];
   var h = 0;
-  for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 360;
-  return "hsl(" + h + " 62% 52%)";
+  for (var i = 0; i < key.length; i++) h = (h * 131 + key.charCodeAt(i)) >>> 0;
+  return Math.round((h * 137.508) % 360);
+}
+
+function vendorColor(vendor) {
+  return "hsl(" + vendorHue(vendor) + " 68% 48%)";
+}
+
+/**
+ * three.js setStyle() only understands comma-separated hsl(), so the CSS form
+ * above silently resolves to white. Hand it an integer instead.
+ */
+function hslToHex(h, s, l) {
+  var sat = s / 100, lum = l / 100;
+  var c = (1 - Math.abs(2 * lum - 1)) * sat;
+  var hp = (((h % 360) + 360) % 360) / 60;
+  var x = c * (1 - Math.abs((hp % 2) - 1));
+  var r = 0, g = 0, b = 0;
+  if (hp < 1) { r = c; g = x; }
+  else if (hp < 2) { r = x; g = c; }
+  else if (hp < 3) { g = c; b = x; }
+  else if (hp < 4) { g = x; b = c; }
+  else if (hp < 5) { r = x; b = c; }
+  else { r = c; b = x; }
+  var m = lum - c / 2;
+  return ((Math.round((r + m) * 255) << 16) | (Math.round((g + m) * 255) << 8) | Math.round((b + m) * 255)) >>> 0;
+}
+
+function vendorHex(vendor) {
+  return hslToHex(vendorHue(vendor), 68, 48);
 }
 
 var TIER_LABEL = { low: "bajo", medium: "medio", high: "alto", very_high: "muy alto", byok: "externo", unknown: "?" };
@@ -510,6 +634,225 @@ function findModel(id) {
 
 function allModels() {
   return catalog.reduce(function (acc, group) { return acc.concat(group.models); }, []);
+}
+
+// --- filtering --------------------------------------------------------------
+
+/**
+ * Mirrors normalizeKey() in enrichment.mjs. The snapshot keys models by a
+ * lowercased alphanumeric-only form, so "claude-opus-5.5" and the leaderboard's
+ * "claudeopus55" have to be reduced the same way before they can be matched.
+ */
+function normalizeKey(value) {
+  return String(value === null || value === undefined ? "" : value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function modelKey(model) {
+  return model.key || normalizeKey(model.id);
+}
+
+/** A BYOK id is "<provider>/<model>"; a Copilot id has no slash. */
+function providerOf(model) {
+  var slash = model.id.indexOf("/");
+  return slash > 0 ? model.id.slice(0, slash) : "copilot";
+}
+
+function providerLabel(id) {
+  for (var i = 0; i < catalog.length; i++) {
+    if (catalog[i].id === id) return catalog[i].label;
+  }
+  return id;
+}
+
+/** The models every ranking, chart and scene works from. */
+function activeModels() {
+  var list = allModels();
+  if (filters.provider !== "all") {
+    list = list.filter(function (model) { return providerOf(model) === filters.provider; });
+  }
+  if (filters.picked) {
+    list = list.filter(function (model) { return filters.picked[modelKey(model)] === true; });
+  }
+  return list;
+}
+
+function isPicked(key) {
+  return !filters.picked || filters.picked[key] === true;
+}
+
+function filterActive() {
+  return filters.provider !== "all" || filters.picked !== null;
+}
+
+/** Keys of the active models, or null when nothing is filtered. */
+function activeKeySet() {
+  if (!filterActive()) return null;
+  var set = {};
+  activeModels().forEach(function (model) { set[modelKey(model)] = true; });
+  return set;
+}
+
+var mineKeys = null;
+
+function isMine(key) {
+  if (!mineKeys) {
+    mineKeys = {};
+    allModels().forEach(function (model) { mineKeys[modelKey(model)] = true; });
+  }
+  return mineKeys[key] === true;
+}
+
+function invalidateMineKeys() {
+  mineKeys = null;
+}
+
+/**
+ * Flips one model in or out of the selection. The first click on an unfiltered
+ * panel seeds the set with everything currently visible, so a single click
+ * removes one model instead of reducing the list to one.
+ */
+function togglePick(key) {
+  var visible = activeModels().map(function (model) { return modelKey(model); });
+  var next = {};
+  if (filters.picked) {
+    Object.keys(filters.picked).forEach(function (k) { if (filters.picked[k]) next[k] = true; });
+  } else {
+    visible.forEach(function (k) { next[k] = true; });
+  }
+  if (next[key]) delete next[key]; else next[key] = true;
+  filters.picked = Object.keys(next).length ? next : null;
+  renderFiltered();
+}
+
+function clearFilters() {
+  filters = { provider: "all", picked: null };
+  benchOnlyMine = false;
+  renderFiltered();
+}
+
+function toggleClass(node, name, on) {
+  if (on) node.classList.add(name); else node.classList.remove(name);
+}
+
+function toggleButton(labelText, pressed, onClick, extra) {
+  var button = el("button", {
+    className: "toggle",
+    type: "button",
+    attrs: { "aria-pressed": pressed ? "true" : "false" },
+    onclick: onClick
+  });
+  if (extra) button.append(extra);
+  button.append(document.createTextNode(labelText));
+  return button;
+}
+
+function providerCounts() {
+  var counts = {};
+  allModels().forEach(function (model) {
+    var id = providerOf(model);
+    counts[id] = (counts[id] || 0) + 1;
+  });
+  return counts;
+}
+
+function renderFilterBar() {
+  var counts = providerCounts();
+  var ids = Object.keys(counts).sort(function (a, b) {
+    if (a === "copilot") return -1;
+    if (b === "copilot") return 1;
+    return providerLabel(a).localeCompare(providerLabel(b));
+  });
+
+  var providers = clear("providerFilter");
+  providers.append(toggleButton("Todos (" + allModels().length + ")", filters.provider === "all",
+    function () { filters.provider = "all"; filters.picked = null; renderFiltered(); }));
+  ids.forEach(function (id) {
+    providers.append(toggleButton(providerLabel(id) + " (" + counts[id] + ")", filters.provider === id, function () {
+      filters.provider = id;
+      // A selection made under another provider would leave an empty list.
+      filters.picked = null;
+      renderFiltered();
+    }));
+  });
+
+  var host = clear("modelFilter");
+  var visible = activeModels();
+  if (!visible.length) {
+    host.append(el("span", { className: "small muted", textContent: "Ningún modelo seleccionado." }));
+  } else {
+    visible.forEach(function (model) {
+      var key = modelKey(model);
+      var swatch = el("span", { className: "swatch", style: { background: vendorColor(vendorOf(model)) } });
+      host.append(toggleButton(model.label, isPicked(key), function () { togglePick(key); }, swatch));
+    });
+  }
+
+  var actions = clear("filterActions");
+  actions.append(el("button", {
+    className: "toggle", type: "button", textContent: "Todos",
+    onclick: function () { filters.picked = null; renderFiltered(); }
+  }));
+  actions.append(el("button", {
+    className: "toggle", type: "button", textContent: "Ninguno",
+    onclick: function () { filters.picked = {}; renderFiltered(); }
+  }));
+  actions.append(toggleButton("Solo mis modelos en la tabla", benchOnlyMine, function () {
+    benchOnlyMine = !benchOnlyMine;
+    renderFiltered();
+  }));
+  actions.append(el("button", {
+    className: "toggle", type: "button", textContent: "Quitar filtros",
+    onclick: clearFilters
+  }));
+
+  renderFilterNote();
+}
+
+function renderFilterNote() {
+  var total = allModels().length;
+  var visible = activeModels().length;
+  var parts = [];
+  if (!filterActive()) {
+    parts.push("Sin filtro: las recomendaciones, el gráfico y la tabla usan los " + total + " modelos que tienes.");
+    parts.push("Elige un proveedor o desmarca modelos para ver qué conviene dentro de ese subconjunto.");
+  } else {
+    parts.push("Filtro activo: " + visible + " de " + total + " modelos.");
+    if (filters.provider !== "all") parts.push("Proveedor: " + providerLabel(filters.provider) + ".");
+    if (filters.picked) parts.push("Selección manual de modelos.");
+    parts.push("Las recomendaciones de la pestaña Enrutado se están calculando solo con estos modelos.");
+  }
+  parts.push("Las notas de la tabla de abajo solo existen para los modelos que aparecen en el benchmark público; " +
+    "un modelo filtrado sin fila aquí no tiene notas, pero sí se evalúa por precio y velocidad.");
+  document.getElementById("filterNote").textContent = parts.join(" ");
+}
+
+function renderFilterBanner() {
+  var host = document.getElementById("filterBanner");
+  if (!host) return;
+  clear("filterBanner");
+  if (!filterActive()) { host.style.display = "none"; return; }
+  host.style.display = "";
+  host.append(el("span", {
+    textContent: "Estas recomendaciones usan " + activeModels().length + " de " + allModels().length +
+      " modelos" + (filters.provider !== "all" ? " (" + providerLabel(filters.provider) + ")" : "") + "."
+  }));
+  host.append(el("button", {
+    className: "toggle", type: "button", textContent: "Quitar filtros", onclick: clearFilters
+  }));
+}
+
+/** Re-renders everything that depends on the active filter. */
+function renderFiltered() {
+  invalidateMineKeys();
+  renderFilterBar();
+  renderFilterBanner();
+  renderRecommendations();
+  renderScatter();
+  renderBenchTable();
+  renderSceneLegend();
+  sceneSignature = null;
+  var panel = document.querySelector('[data-panel="scene"]');
+  if (three || (panel && panel.dataset.active === "true")) ensureScene();
 }
 
 function setStatus(text, tone) {
@@ -605,7 +948,7 @@ function rolePlaybook(type) {
 
 function rankFor(playbook) {
   var keys = playbook.keys;
-  var rows = allModels().map(function (model) {
+  var rows = activeModels().map(function (model) {
     var raw = {};
     keys.forEach(function (key) {
       var value = model.bench ? model.bench[key] : null;
@@ -1006,7 +1349,7 @@ function renderProfile() {
 }
 
 function scatterPoints() {
-  return allModels().filter(function (model) {
+  return activeModels().filter(function (model) {
     return typeof model.blendedCost === "number" && model.bench && typeof model.bench.total === "number";
   });
 }
@@ -1117,9 +1460,14 @@ function renderBenchTable() {
   table.append(head);
 
   var mine = {};
-  allModels().forEach(function (model) { mine[model.id] = true; });
+  allModels().forEach(function (model) { mine[modelKey(model)] = true; });
 
-  var rows = benchRows.slice().sort(function (a, b) {
+  var limit = activeKeySet();
+  var rows = benchRows.filter(function (row) {
+    if (benchOnlyMine && !mine[row.id]) return false;
+    if (limit && !limit[row.id]) return false;
+    return true;
+  }).sort(function (a, b) {
     var av = benchValue(a, benchSort.key), bv = benchValue(b, benchSort.key);
     if (typeof av === "string" || typeof bv === "string") {
       return String(av || "").localeCompare(String(bv || "")) * benchSort.dir;
@@ -1151,10 +1499,17 @@ function renderBenchTable() {
     });
     body.append(tr);
   });
+  if (!rows.length) {
+    body.append(el("tr", { className: "empty-row" }, [
+      el("td", { colSpan: 10, textContent: "Ninguno de los modelos filtrados tiene notas de benchmarks públicos todavía. Los benchmarks públicos solo cubren modelos conocidos: los modelos internos de GitHub Copilot no aparecen aquí." })
+    ]));
+  }
   table.append(body);
 
   document.getElementById("benchSub").textContent =
-    rows.length + " modelos con notas públicas. Las filas resaltadas son modelos que tienes disponibles ahora mismo.";
+    rows.length + " de " + benchRows.length + " modelos con notas públicas" +
+    (limit ? " (filtrados)" : "") +
+    ". Las filas resaltadas son modelos que tienes disponibles ahora mismo.";
 }
 
 function renderBenchMeta() {
@@ -1173,17 +1528,33 @@ function renderBenchMeta() {
 // --- 3D tab -----------------------------------------------------------------
 
 var three = null;
-var threeFailed = false;
+var sceneSignature = null;
+var sceneFailedFor = null;
+var sceneResetView = null;
+var sceneSetSpin = null;
+var sceneResize = null;
+var sceneButtonsWired = false;
 
+/** Rebuild only when the filter really changed, not on every tab switch. */
+function currentSceneSignature() {
+  var picked = "all";
+  if (filters.picked) {
+    picked = Object.keys(filters.picked).filter(function (key) { return filters.picked[key]; }).sort().join(",");
+  }
+  return filters.provider + "|" + picked + "|" + benchRows.length;
+}
+
+/**
+ * Every benchmark row is always plotted, so the landscape and the reference
+ * frame stay comparable. The filter only decides which ones get a ring and
+ * which ones fade into the background.
+ */
 function scenePoints() {
-  var mine = {};
-  allModels().forEach(function (model) {
-    var short = model.id.indexOf("/") >= 0 ? model.id.slice(model.id.indexOf("/") + 1) : model.id;
-    mine[short] = true;
-  });
+  var limit = activeKeySet();
   return benchRows.filter(function (row) {
     return row.bench && typeof row.bench.total === "number";
   }).map(function (row) {
+    var active = !limit || limit[row.id] === true;
     return {
       id: row.id,
       label: row.label,
@@ -1191,7 +1562,8 @@ function scenePoints() {
       total: row.bench.total,
       cost: typeof row.blendedCost === "number" ? row.blendedCost : null,
       speed: row.speed && typeof row.speed.outputTps === "number" ? row.speed.outputTps : null,
-      mine: !!mine[row.id]
+      mine: active && isMine(row.id),
+      dim: !active
     };
   });
 }
@@ -1220,7 +1592,11 @@ function buildScene(THREE) {
   var xMin = costs.length ? Math.min.apply(null, costs) : 0;
   var xMax = costs.length ? Math.max.apply(null, costs) : 1;
   var zMax = speeds.length ? Math.max.apply(null, speeds) : 1;
-  var yMin = 40, yMax = 90;
+  // The vertical scale spans the measured range instead of a fixed 0-100, so
+  // the axis ticks land exactly on the worst and the best measured model.
+  var totals = points.map(function (p) { return p.total; });
+  var yMin = totals.length ? Math.min.apply(null, totals) : 40;
+  var yMax = totals.length ? Math.max.apply(null, totals) : 90;
 
   var span = 200;
   function px(point) {
@@ -1235,12 +1611,13 @@ function buildScene(THREE) {
 
   var geometry = new THREE.SphereGeometry(1, 16, 12);
   var pickable = [];
+  function pointRadius(point) { return 2.6 + (point.total / 100) * 5.4; }
   points.forEach(function (point) {
-    var radius = 2.6 + (point.total / 100) * 5.4;
+    var radius = pointRadius(point);
     var material = new THREE.MeshBasicMaterial({
-      color: new THREE.Color().setStyle(vendorColor(point.vendor)).getHex(),
+      color: vendorHex(point.vendor),
       transparent: true,
-      opacity: point.mine ? 0.98 : 0.6
+      opacity: point.dim ? 0.16 : point.mine ? 0.98 : 0.62
     });
     var mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(px(point), py(point), pz(point));
@@ -1260,10 +1637,124 @@ function buildScene(THREE) {
     }
   });
 
-  var box = new THREE.Box3().setFromObject(group);
-  var center = box.getCenter(new THREE.Vector3());
-  var sphereSize = box.getSize(new THREE.Vector3()).length() || span;
+  // The frame is derived from the point positions themselves, expanded by the
+  // largest sphere, so the wireframe, the floor grid, the arrows and the tick
+  // labels all agree with where the spheres actually sit.
+  var dataBox = new THREE.Box3();
+  points.forEach(function (point) {
+    dataBox.expandByPoint(new THREE.Vector3(px(point), py(point), pz(point)));
+  });
+  var biggest = 0;
+  points.forEach(function (point) { biggest = Math.max(biggest, pointRadius(point)); });
+  dataBox.expandByScalar(biggest * 1.05);
+
+  var center = dataBox.getCenter(new THREE.Vector3());
+  var size = dataBox.getSize(new THREE.Vector3());
+  var sphereSize = size.length() || span;
   var radius = sphereSize * 1.15;
+
+  var AXIS = {
+    x: { hex: 0xf0a000, css: "#a86a00", title: "Precio (log) →" },
+    y: { hex: 0x1a9c4a, css: "#157f3c", title: "↑ Nota global" },
+    z: { hex: 0x2f7ae5, css: "#2461b8", title: "Velocidad (tok/s) →" }
+  };
+  var LABEL_H = sphereSize * 0.052;
+  var LABEL_FONT = "600 44px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+  // Sprites always face the camera, so the labels stay readable while rotating.
+  function makeLabel(text, cssColor, worldHeight) {
+    var pad = 14, font = 44;
+    var probe = document.createElement("canvas").getContext("2d");
+    probe.font = LABEL_FONT;
+    var canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(probe.measureText(text).width) + pad * 2;
+    canvas.height = font + pad * 2;
+    var ctx = canvas.getContext("2d");
+    var w = canvas.width, h = canvas.height;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
+    ctx.lineWidth = 2;
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(1, 1, w - 2, h - 2, 12);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(0, 0, w, h);
+    }
+    ctx.font = LABEL_FONT;
+    ctx.fillStyle = cssColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, w / 2, h / 2 + 2);
+
+    var texture = new THREE.CanvasTexture(canvas);
+    if (THREE.SRGBColorSpace && "colorSpace" in texture) texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    var sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture, transparent: true, depthTest: false, depthWrite: false
+    }));
+    sprite.scale.set(worldHeight * (w / h), worldHeight, 1);
+    sprite.renderOrder = 20;
+    return sprite;
+  }
+
+  var frame = new THREE.Group();
+  scene.add(frame);
+
+  var boxHelper = new THREE.Box3Helper(dataBox, AXIS.y.hex);
+  boxHelper.material.transparent = true;
+  boxHelper.material.opacity = 0.24;
+  boxHelper.material.depthWrite = false;
+  frame.add(boxHelper);
+
+  var grid = new THREE.GridHelper(Math.max(size.x, size.z) * 1.4, 10, 0x8c96a3, 0xc4ccd6);
+  grid.position.set(center.x, dataBox.min.y, center.z);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.32;
+  grid.material.depthWrite = false;
+  frame.add(grid);
+
+  var pad = sphereSize * 0.05;
+  var origin = new THREE.Vector3(dataBox.min.x - pad, dataBox.min.y, dataBox.min.z - pad);
+  [
+    { dir: new THREE.Vector3(1, 0, 0), len: size.x + pad * 2, cfg: AXIS.x },
+    { dir: new THREE.Vector3(0, 1, 0), len: size.y + pad * 2, cfg: AXIS.y },
+    { dir: new THREE.Vector3(0, 0, 1), len: size.z + pad * 2, cfg: AXIS.z }
+  ].forEach(function (axis) {
+    var arrow = new THREE.ArrowHelper(axis.dir, origin, axis.len, axis.cfg.hex,
+      Math.max(axis.len * 0.04, 2), Math.max(axis.len * 0.024, 1.4));
+    arrow.line.material.transparent = true;
+    arrow.line.material.opacity = 0.85;
+    arrow.line.material.depthWrite = false;
+    arrow.cone.material.transparent = true;
+    arrow.cone.material.opacity = 0.95;
+    arrow.cone.material.depthWrite = false;
+    frame.add(arrow);
+  });
+
+  // Ticks sit at the real data extremes, not at the padded box edges.
+  var xLow = px({ cost: Math.pow(10, xMin) - 0.05 });
+  var xHigh = px({ cost: Math.pow(10, xMax) - 0.05 });
+  var yLow = py({ total: yMin });
+  var yHigh = py({ total: yMax });
+  var zLow = pz({ speed: 0 });
+  var zHigh = pz({ speed: zMax });
+  [
+    { text: money(Math.pow(10, xMin) - 0.05), cfg: AXIS.x, at: new THREE.Vector3(xLow, origin.y, origin.z) },
+    { text: money(Math.pow(10, xMax) - 0.05), cfg: AXIS.x, at: new THREE.Vector3(xHigh, origin.y, origin.z) },
+    { text: num(yMin, 1), cfg: AXIS.y, at: new THREE.Vector3(origin.x, yLow, origin.z) },
+    { text: num(yMax, 1), cfg: AXIS.y, at: new THREE.Vector3(origin.x, yHigh, origin.z) },
+    { text: "0", cfg: AXIS.z, at: new THREE.Vector3(origin.x, origin.y, zLow) },
+    { text: num(zMax, 0), cfg: AXIS.z, at: new THREE.Vector3(origin.x, origin.y, zHigh) },
+    { text: AXIS.x.title, cfg: AXIS.x, at: new THREE.Vector3(dataBox.max.x + pad * 4, origin.y, origin.z), big: true },
+    { text: AXIS.y.title, cfg: AXIS.y, at: new THREE.Vector3(origin.x, dataBox.max.y + pad * 3, origin.z), big: true },
+    { text: AXIS.z.title, cfg: AXIS.z, at: new THREE.Vector3(origin.x, origin.y, dataBox.max.z + pad * 4), big: true }
+  ].forEach(function (tick) {
+    var sprite = makeLabel(tick.text, tick.cfg.css, tick.big ? LABEL_H * 1.35 : LABEL_H);
+    sprite.position.copy(tick.at);
+    frame.add(sprite);
+  });
 
   var theta = 0.9;
   var phi = 1.15;
@@ -1329,45 +1820,149 @@ function buildScene(THREE) {
     updateCamera();
   }, { passive: false });
 
-  window.addEventListener("resize", function () {
+  sceneResize = function () {
     var w = host.clientWidth || width;
     var h = host.clientHeight || height;
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     updateCamera();
-  });
+  };
+  window.addEventListener("resize", sceneResize);
+
+  var home = { theta: 0.9, phi: 1.15, radius: sphereSize * 1.15 };
+  sceneResetView = function () {
+    theta = home.theta;
+    phi = home.phi;
+    radius = home.radius;
+    updateCamera();
+  };
+
+  var spinning = false;
+  var spinFrame = null;
+  function spinTick() {
+    if (!spinning) { spinFrame = null; return; }
+    theta -= 0.004;
+    updateCamera();
+    spinFrame = window.requestAnimationFrame(spinTick);
+  }
+  sceneSetSpin = function (on) {
+    spinning = !!on;
+    if (spinning && spinFrame === null) spinFrame = window.requestAnimationFrame(spinTick);
+  };
+
+  var highlighted = points.filter(function (point) { return point.mine; }).length;
+  var dimmed = points.filter(function (point) { return point.dim; }).length;
+  var status = document.getElementById("sceneStatus");
+  if (status) {
+    status.textContent = points.length + " esferas · " + highlighted + " con halo (tus modelos)" +
+      (dimmed ? " · " + dimmed + " atenuadas por el filtro" : "");
+  }
 
   updateCamera();
   return renderer;
 }
 
-async function ensureScene() {
-  if (three || threeFailed) return;
+function disposeScene() {
+  if (sceneResetView) sceneResetView = null;
+  if (sceneSetSpin) sceneSetSpin(false);
+  sceneSetSpin = null;
+  if (sceneResize) { window.removeEventListener("resize", sceneResize); sceneResize = null; }
+  if (!three) return;
   var host = document.getElementById("scene3d");
+  try {
+    if (three.domElement && three.domElement.parentNode === host) host.removeChild(three.domElement);
+    three.dispose();
+  } catch (error) { /* a lost WebGL context can throw on teardown; nothing left to do */ }
+  three = null;
+  sceneSignature = null;
+  var tip = document.getElementById("sceneTip");
+  if (tip) tip.style.display = "none";
+}
+
+async function ensureScene() {
+  wireSceneButtons();
+  var signature = currentSceneSignature();
+  if (three && sceneSignature === signature) return;
+  if (three) disposeScene();
+  if (sceneFailedFor === signature) return;
+
+  var host = document.getElementById("scene3d");
+  clearSceneMessages();
   try {
     var module = await import("/vendor/three.module.min.js");
     three = buildScene(module);
-    if (!three) threeFailed = true;
+    sceneSignature = signature;
+    if (!three) {
+      sceneFailedFor = signature;
+      sceneMessage("No hay datos de benchmark suficientes para dibujar el mapa.");
+    }
   } catch (error) {
-    threeFailed = true;
-    host.append(el("p", { className: "small muted", style: { padding: "16px" },
-      textContent: "No se pudo cargar el visor 3D (" + (error && error.message ? error.message : "error desconocido") +
-        "). La pestaña Comparativa tiene exactamente los mismos datos." }));
+    sceneFailedFor = signature;
+    sceneMessage("No se pudo cargar el visor 3D (" + (error && error.message ? error.message : "error desconocido") +
+      "). La pestaña Comparativa tiene exactamente los mismos datos.");
   }
+}
+
+function sceneMessage(text) {
+  var host = document.getElementById("scene3d");
+  host.append(el("p", { className: "small muted scene-message", style: { padding: "16px" }, textContent: text }));
+}
+
+function clearSceneMessages() {
+  document.querySelectorAll("#scene3d .scene-message").forEach(function (node) { node.remove(); });
 }
 
 function renderSceneLegend() {
   var legend = clear("sceneLegend");
   var vendors = {};
-  scenePoints().forEach(function (point) { vendors[point.vendor] = true; });
+  var points = scenePoints();
+  points.forEach(function (point) { vendors[point.vendor] = true; });
   Object.keys(vendors).sort().forEach(function (vendor) {
     legend.append(el("span", null, [
       el("span", { className: "dot", style: { background: vendorColor(vendor) } }),
       el("span", { textContent: " " + vendor })
     ]));
   });
-  legend.append(el("span", { className: "tiny", textContent: scenePoints().filter(function (p) { return p.mine; }).length + " modelos tuyos, resaltados con anillo" }));
+  var highlighted = points.filter(function (point) { return point.mine; }).length;
+  legend.append(el("span", {
+    className: "tiny",
+    textContent: highlighted + " modelos resaltados con halo" +
+      (filterActive() ? " (" + activeModels().length + " pasan el filtro actual)" : "")
+  }));
+  renderAxisKey();
+}
+
+function renderAxisKey() {
+  var host = document.getElementById("sceneAxes");
+  if (!host) return;
+  clear("sceneAxes");
+  [
+    ["#c07800", "x · Precio", "izquierda barato → derecha caro, en escala logarítmica"],
+    ["#157f3c", "y · Nota global", "abajo el peor modelo medido → arriba el mejor (escala 0–100)"],
+    ["#2461b8", "z · Velocidad", "fondo lento → frente rápido, en tokens por segundo"]
+  ].forEach(function (axis) {
+    host.append(el("span", null, [
+      el("span", { className: "swatch", style: { background: axis[0] } }),
+      el("b", { textContent: axis[1] }),
+      el("span", { textContent: " " + axis[2] })
+    ]));
+  });
+}
+
+function wireSceneButtons() {
+  if (sceneButtonsWired) return;
+  sceneButtonsWired = true;
+  var reset = document.getElementById("sceneReset");
+  if (reset) reset.addEventListener("click", function () { if (sceneResetView) sceneResetView(); });
+  var spin = document.getElementById("sceneSpin");
+  if (spin) {
+    spin.addEventListener("click", function () {
+      var on = spin.getAttribute("aria-pressed") !== "true";
+      spin.setAttribute("aria-pressed", on ? "true" : "false");
+      if (sceneSetSpin) sceneSetSpin(on);
+    });
+  }
 }
 
 // --- guide tab --------------------------------------------------------------
@@ -1383,7 +1978,10 @@ function renderGuide() {
     ["Fabricante frente a proveedor", "El proveedor es quien te sirve el modelo (GitHub Copilot o tu proveedor externo). El fabricante es quien lo construyó (Anthropic, OpenAI, Alibaba…). Un mismo fabricante puede llegarte por las dos vías."],
     ["Traer tu propia clave", "Los modelos del proveedor externo se pagan contra tu cuenta de ese proveedor, no contra la cuota de Copilot. Son los que hacen barato el trabajo masivo."],
     ["Auto", "Cuando el agente elige modelo por su cuenta tiende a subir a los grandes. Fijar los subagentes con un modelo barato y exigencia required es lo que corta esa escalada."],
-    ["Instantánea de datos", "Un fichero JSON con fabricantes, precios, notas de benchmark y velocidades, generado desde fuentes públicas y actualizado periódicamente por el propio repositorio."]
+    ["Instantánea de datos", "Un fichero JSON con fabricantes, precios, notas de benchmark y velocidades, generado desde fuentes públicas y actualizado periódicamente por el propio repositorio."],
+    ["Filtro por proveedor", "Reduce todo lo que ves a los modelos de un solo proveedor. Al elegir tu proveedor externo, las seis recomendaciones y los subagentes se recalculan usando solo esos modelos: sirve para comprobar qué conviene dentro de lo que ya pagas."],
+    ["Selección de modelos", "Puedes quitar modelos concretos de la comparación con un clic. El primer clic deja seleccionados todos y desmarca el que pulsaste, así que se quita de uno en uno. Mientras haya selección manual, todo se calcula con los que queden."],
+    ["Solo mis modelos en la tabla", "La tabla tiene los 88 modelos del ranking público. Este interruptor la recorta a las filas que coinciden con tu catálogo, para no perder de vista los tuyos entre los demás."]
   ]);
 }
 
@@ -1449,6 +2047,8 @@ async function refreshData() {
     if (data.rows) benchRows = data.rows;
     if (data.meta) benchMeta = data.meta;
     if (data.source) benchSource = data.source;
+    sceneSignature = null;
+    if (three) disposeScene();
     setStatus("Datos actualizados.", "ok");
     renderAll();
   } catch (error) {
@@ -1457,11 +2057,14 @@ async function refreshData() {
 }
 
 function renderAll() {
+  invalidateMineKeys();
   renderRoles();
   renderSubagents();
   renderRoutingDefs();
   renderCatalog();
   renderCatalogDefs();
+  renderFilterBar();
+  renderFilterBanner();
   renderRecommendations();
   renderProfile();
   renderScatter();
