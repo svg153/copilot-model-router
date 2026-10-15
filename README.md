@@ -328,6 +328,19 @@ Sin `targets` el workflow usa `[task]` como única unidad de trabajo.
 está corrupto, se usan los valores por defecto de `routing.mjs`, así que un JSON roto
 nunca rompe una ejecución.
 
+Antes de cada escritura se guarda una copia del estado anterior en
+`artifacts/routing.json.bak`, y esa copia solo se sobrescribe si el archivo actual se
+puede leer y parsear. Es decir: un JSON roto **nunca** puede pisar una copia buena.
+Si al leer `routing.json` hay un error (que no sea "no existe") o el JSON no parsea,
+se recupera automáticamente el `.bak` en lugar de caer a los valores por defecto, así
+que un *Restaurar por defecto* accidental o un archivo corrupto se puede deshacer a
+mano copiando el `.bak` sobre el `.json`.
+
+El parser tolera un BOM UTF-8 inicial (`\uFEFF`). No es un detalle menor: `JSON.parse`
+lo rechaza, y hay editores y herramientas de Windows que lo añaden sin avisar. Sin esa
+tolerancia, un archivo perfectamente válido se interpretaba como corrupto y el panel
+lo sustituía por los valores por defecto en la siguiente escritura.
+
 ### Fijación permanente sin la extensión
 
 El comando `copilot config` **no** puede escribir estos ajustes (responde *"Edit

@@ -5,3 +5,4 @@ Desktop.ini
 *.tmp
 routing.json.tmp
 **/artifacts/routing.json
+**/artifacts/routing.json.bak

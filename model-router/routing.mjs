@@ -3,7 +3,7 @@
 // Everything here is plain data so both the canvas renderer and the workflow
 // body can share one source of truth.
 
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { applyEnrichment } from "./enrichment.mjs";
@@ -11,6 +11,7 @@ import { applyEnrichment } from "./enrichment.mjs";
 export const COPILOT_HOME = process.env.COPILOT_HOME || join(homedir(), ".copilot");
 export const ARTIFACT_DIR = join(COPILOT_HOME, "extensions", "model-router", "artifacts");
 export const ROUTING_FILE = join(ARTIFACT_DIR, "routing.json");
+export const ROUTING_BAK_FILE = `${ROUTING_FILE}.bak`;
 
 /**
  * Price tiers the runtime reports for GitHub-hosted models. Tiers are relative
@@ -447,19 +448,62 @@ function mergeRouting(base, patch, { replaceAgentEntries = false } = {}) {
     return out;
 }
 
-export async function loadRouting() {
+/**
+ * `JSON.parse` rejects a leading UTF-8 BOM, which PowerShell's Set-Content and
+ * several editors happily add. Without this, a perfectly good config file looks
+ * corrupt and gets replaced by generated defaults on the next save.
+ */
+function parseRouting(raw) {
+    return JSON.parse(String(raw).replace(/^\uFEFF/, ""));
+}
+
+/** Only snapshots a config we know is valid, so a bad read cannot clobber a good backup. */
+async function backupRouting() {
     try {
-        const raw = await readFile(ROUTING_FILE, "utf8");
-        return mergeRouting(DEFAULT_ROUTING, JSON.parse(raw), { replaceAgentEntries: true });
+        parseRouting(await readFile(ROUTING_FILE, "utf8"));
+        await copyFile(ROUTING_FILE, ROUTING_BAK_FILE);
+        return true;
     } catch {
-        // Missing or corrupt config falls back to catalog-derived defaults rather
-        // than failing a run.
+        return false;
+    }
+}
+
+async function loadBackupRouting() {
+    try {
+        return mergeRouting(DEFAULT_ROUTING, parseRouting(await readFile(ROUTING_BAK_FILE, "utf8")), {
+            replaceAgentEntries: true,
+        });
+    } catch {
+        return null;
+    }
+}
+
+export async function loadRouting() {
+    let raw;
+    try {
+        raw = await readFile(ROUTING_FILE, "utf8");
+    } catch (error) {
+        // A missing file is the normal first-run case. Anything else (a lock held
+        // by a scanner, a permissions blip) must not silently become the new truth.
+        if (error?.code !== "ENOENT") {
+            const recovered = await loadBackupRouting();
+            if (recovered) return recovered;
+        }
+        return mergeRouting(defaultRoutingFor(await detectedCatalog()), null);
+    }
+    try {
+        return mergeRouting(DEFAULT_ROUTING, parseRouting(raw), { replaceAgentEntries: true });
+    } catch {
+        // Corrupt on disk: prefer the last known-good config over generated defaults.
+        const recovered = await loadBackupRouting();
+        if (recovered) return recovered;
         return mergeRouting(defaultRoutingFor(await detectedCatalog()), null);
     }
 }
 
 export async function saveRouting(patch) {
     const next = mergeRouting(await loadRouting(), patch);
+    await backupRouting();
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
     const tmp = `${ROUTING_FILE}.tmp`;
     await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, "utf8");
@@ -469,6 +513,7 @@ export async function saveRouting(patch) {
 
 export async function resetRouting() {
     const defaults = defaultRoutingFor(await detectedCatalog());
+    await backupRouting();
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
     await writeFile(ROUTING_FILE, `${JSON.stringify(defaults, null, 2)}\n`, "utf8");
     return mergeRouting(defaults, null);
