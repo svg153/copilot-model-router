@@ -457,10 +457,14 @@ function parseRouting(raw) {
     return JSON.parse(String(raw).replace(/^\uFEFF/, ""));
 }
 
-/** Only snapshots a config we know is valid, so a bad read cannot clobber a good backup. */
-async function backupRouting() {
+/** Only snapshots a config we know is valid, so a bad read cannot clobber a good backup.
+ * A write identical to the current file carries no information; skipping the copy in
+ * that case keeps a good backup alive through repeated no-op saves and resets. */
+async function backupRouting(nextJson) {
     try {
-        parseRouting(await readFile(ROUTING_FILE, "utf8"));
+        const raw = await readFile(ROUTING_FILE, "utf8");
+        parseRouting(raw);
+        if (typeof nextJson === "string" && raw === nextJson) return false;
         await copyFile(ROUTING_FILE, ROUTING_BAK_FILE);
         return true;
     } catch {
@@ -503,19 +507,21 @@ export async function loadRouting() {
 
 export async function saveRouting(patch) {
     const next = mergeRouting(await loadRouting(), patch);
-    await backupRouting();
+    const json = `${JSON.stringify(next, null, 2)}\n`;
+    await backupRouting(json);
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
     const tmp = `${ROUTING_FILE}.tmp`;
-    await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    await writeFile(tmp, json, "utf8");
     await rename(tmp, ROUTING_FILE);
     return next;
 }
 
 export async function resetRouting() {
     const defaults = defaultRoutingFor(await detectedCatalog());
-    await backupRouting();
+    const json = `${JSON.stringify(defaults, null, 2)}\n`;
+    await backupRouting(json);
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
-    await writeFile(ROUTING_FILE, `${JSON.stringify(defaults, null, 2)}\n`, "utf8");
+    await writeFile(ROUTING_FILE, json, "utf8");
     return mergeRouting(defaults, null);
 }
 

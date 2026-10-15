@@ -8,7 +8,7 @@ premium por culpa de `Auto`.
 
 | Pieza | Qué hace |
 | --- | --- |
-| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. |
+| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. Interfaz con pestañas segmentadas con iconos, tarjetas, chips y medidores; el botón **Restablecer** es rojo (acción destructiva) y la interfaz respeta `prefers-reduced-motion`. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
 | Pestaña **Comparativa** | Ranking de benchmarks públicos, gráfico calidad/precio, una recomendación por tipo de subagente y **filtros por proveedor y por modelo**. |
 | Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos (calidad, precio y velocidad) con marco de referencia, rejilla y etiquetas de eje. Arranca solo con los modelos que puedes elegir y tiene filtros propios por estimadas, sin precio y fabricante. Solo se carga al abrir la pestaña. |
