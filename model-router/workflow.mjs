@@ -1,6 +1,5 @@
-// The plan-then-execute workflow: an expensive model plans, cheap models
-// execute in parallel, a third model verifies. Every stage pins its own model
-// so the routing is deterministic rather than left to Auto.
+// Orchestrate decomposes the task, Plan details it, Execute implements it, and
+// Verify checks it. Each stage pins its configured model rather than using Auto.
 
 import { defineWorkflow } from "@github/copilot-sdk/extension";
 import { loadRouting } from "./routing.mjs";
@@ -10,14 +9,34 @@ function asText(value) {
     return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-function planPrompt(task, targets) {
+function orchestratePrompt(task, targets) {
+    return [
+        "You are the orchestration stage of a cost-routed workflow.",
+        "Decompose the task and identify concrete planning targets, dependencies, and scope boundaries.",
+        "Each target must be a self-contained, pairwise non-overlapping work unit safe to execute in parallel.",
+        "Group work with dependencies or shared-file conflicts into one target; mention ordering and dependencies in summary.",
+        "Do not implement changes, edit files, or execute implementation commands.",
+        "Return only a JSON object with summary (a non-empty string describing decomposition and dependencies)",
+        "and targets (a non-empty array of self-contained strings naming files, symbols, or work units).",
+        "Keep supplied targets intact; describe their dependencies and scope in the summary.",
+        `Task: ${task}`,
+        targets.length ? `Supplied targets:\n${targets.map((t) => `- ${t}`).join("\n")}` : "",
+    ].filter(Boolean).join("\n");
+}
+
+function planPrompt(task, targets, orchestration) {
     return [
         "You are the planning stage of a cost-routed workflow. Produce a plan only; do not execute it.",
         "Return a numbered list of concrete, independently executable steps.",
         "Each step must be self-contained: name the files, symbols, or commands involved.",
+        "Produce a very detailed plan: cover dependencies, implementation details, edge cases,",
+        "acceptance criteria, and exact validation commands for each target.",
+        "Keep parallel execution targets pairwise non-overlapping; group dependent or conflicting changes together.",
+        "Do not edit files or execute implementation commands.",
         "State any assumption you had to make. Flag steps that are risky or irreversible.",
         "",
         `Task: ${task}`,
+        `Orchestration:\n${orchestration.summary}`,
         targets.length ? `Targets:\n${targets.map((t) => `- ${t}`).join("\n")}` : "",
     ]
         .filter(Boolean)
@@ -58,15 +77,16 @@ export const planThenExecute = defineWorkflow({
     meta: {
         name: "plan-then-execute",
         description:
-            "Plan with a premium model, execute the units in parallel on cheap models, then verify with a third model. " +
-            "args: { task: string, targets?: string[], planModel?: string, workerModel?: string, verifyModel?: string, verify?: boolean }",
-        phases: [{ title: "Plan" }, { title: "Execute" }, { title: "Verify" }],
+            "Orchestrate task decomposition, produce a detailed plan, execute units, then independently verify. " +
+            "args: { task: string, targets?: string[], orchestrateModel?: string, planModel?: string, workerModel?: string, verifyModel?: string, verify?: boolean }",
+        phases: [{ title: "Orchestrate" }, { title: "Plan" }, { title: "Execute" }, { title: "Verify" }],
         argsSchema: {
             type: "object",
             required: ["task"],
             properties: {
                 task: { type: "string" },
                 targets: { type: "array", items: { type: "string" } },
+                orchestrateModel: { type: "string" },
                 planModel: { type: "string" },
                 workerModel: { type: "string" },
                 verifyModel: { type: "string" },
@@ -83,17 +103,45 @@ export const planThenExecute = defineWorkflow({
             return { ok: false, reason: "args.task is required" };
         }
 
-        const targets = Array.isArray(ctx.args.targets)
+        const suppliedTargets = Array.isArray(ctx.args.targets)
             ? ctx.args.targets.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
             : [];
+        const orchestrateModel = ctx.args.orchestrateModel || routing.roles.orchestrate.model;
         const planModel = ctx.args.planModel || routing.roles.plan.model;
         const workerModel = ctx.args.workerModel || routing.roles.execute.model;
         const verifyModel = ctx.args.verifyModel || routing.roles.verify.model;
 
+        ctx.phase("Orchestrate");
+        ctx.log(`Orchestrate stage on ${orchestrateModel}`);
+        const output = await ctx.agent(orchestratePrompt(task, suppliedTargets), {
+            label: "orchestrate",
+            model: orchestrateModel,
+            reasoningEffort: routing.roles.orchestrate.effort,
+        });
+        let orchestration;
+        try {
+            orchestration = typeof output === "string" ? JSON.parse(output) : output;
+        } catch (error) {
+            ctx.log(`Orchestrate stage returned invalid JSON: ${error.message}`);
+            return { ok: false, stage: "orchestrate", orchestrateModel, reason: "Invalid orchestration JSON" };
+        }
+        if (!orchestration || typeof orchestration.summary !== "string" || !orchestration.summary.trim() ||
+            !Array.isArray(orchestration.targets) || !orchestration.targets.length ||
+            orchestration.targets.some((target) => typeof target !== "string" || !target.trim())) {
+            ctx.log("Orchestrate stage returned no valid decomposition or targets; aborting before Plan.");
+            return { ok: false, stage: "orchestrate", orchestrateModel, reason: "Invalid orchestration decomposition or targets" };
+        }
+        orchestration = {
+            summary: orchestration.summary.trim(),
+            targets: orchestration.targets.map((target) => target.trim()),
+        };
+        const planningTargets = [...new Set([...orchestration.targets, ...suppliedTargets])];
+        const targets = suppliedTargets.length ? suppliedTargets : orchestration.targets;
+
         ctx.phase("Plan");
         ctx.log(`Plan stage on ${planModel}`);
         const plan = asText(
-            await ctx.agent(planPrompt(task, targets), {
+            await ctx.agent(planPrompt(task, planningTargets, orchestration), {
                 label: "plan",
                 model: planModel,
                 reasoningEffort: routing.roles.plan.effort,
@@ -105,7 +153,7 @@ export const planThenExecute = defineWorkflow({
         }
 
         ctx.phase("Execute");
-        const units = targets.length ? targets : [task];
+        const units = targets;
         ctx.log(`Execute stage: ${units.length} unit(s) on ${workerModel}`);
         const executed = await ctx.pipeline(units, (previous, item, index) =>
             ctx.agent(executePrompt(task, plan, String(item)), {
@@ -141,7 +189,10 @@ export const planThenExecute = defineWorkflow({
         return {
             ok: true,
             task,
-            models: { plan: planModel, execute: workerModel, verify: verifyModel },
+            models: { orchestrate: orchestrateModel, plan: planModel, execute: workerModel, verify: verifyModel },
+            orchestration,
+            planningTargets,
+            targets,
             plan,
             results,
             verification,

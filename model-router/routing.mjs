@@ -31,7 +31,8 @@ export const EXPENSIVE_TIERS = new Set(["high", "very_high"]);
  *   setx MODEL_ROUTER_PROVIDER_ID "<id>"
  *   setx MODEL_ROUTER_PROVIDER_LABEL "<display name>"
  */
-export const EXTERNAL_PROVIDER_ID = process.env.MODEL_ROUTER_PROVIDER_ID || "";
+export const EXTERNAL_PROVIDER_ID =
+    process.env.MODEL_ROUTER_PROVIDER_ID || "";
 export const EXTERNAL_PROVIDER_LABEL = process.env.MODEL_ROUTER_PROVIDER_LABEL || "";
 
 /**
@@ -48,6 +49,7 @@ export const DEFAULT_PROVIDER_LABELS = {
         ? { [EXTERNAL_PROVIDER_ID]: EXTERNAL_PROVIDER_LABEL || EXTERNAL_PROVIDER_ID }
         : {}),
 };
+const ROUTED_MODEL_PROVIDER_ID = EXTERNAL_PROVIDER_ID;
 
 /**
  * A bring-your-own-key provider usually reports its own opaque id (a UUID or a
@@ -179,6 +181,34 @@ export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LA
     return providers;
 }
 
+/** Compares saved workflow model IDs with the current session's live model list. */
+export function catalogDiagnostics(routing, catalog) {
+    const models = (catalog?.providers ?? []).flatMap((provider) => provider.models ?? []);
+    const live = catalog?.source === "live";
+    return {
+        source: catalog?.source ?? "unknown",
+        fetchedAt: catalog?.fetchedAt ?? null,
+        modelCount: models.length,
+        providers: (catalog?.providers ?? []).map((provider) => ({
+            id: provider.id,
+            label: provider.label,
+            modelCount: (provider.models ?? []).length,
+        })),
+        roles: Object.fromEntries(
+            WORKFLOW_ROLES.map((role) => {
+                const model = routing?.roles?.[role]?.model ?? "";
+                return [
+                    role,
+                    {
+                        model,
+                        available: live ? models.some((entry) => entry.id === model) : null,
+                    },
+                ];
+            })
+        ),
+    };
+}
+
 /** Model ids the policy should steer bulk work away from. */
 export function expensiveModelIds(catalog) {
     return catalog
@@ -208,10 +238,9 @@ export const BUILTIN_SUBAGENT_TYPES = [
     "security-review",
 ];
 
-// Generic cheap defaults for a machine with no second provider configured.
-// With MODEL_ROUTER_PROVIDER_ID set, default execution goes to that provider.
-const CHEAP = EXTERNAL_PROVIDER_ID ? `${EXTERNAL_PROVIDER_ID}/deepseek-v4-flash` : "claude-haiku-5.5";
-const CHEAP_ALT = EXTERNAL_PROVIDER_ID ? `${EXTERNAL_PROVIDER_ID}/qwen3.6` : "gpt-5.4-mini";
+export const WORKFLOW_ROLES = ["orchestrate", "plan", "execute", "verify"];
+const ROUTED_MODEL_PREFIX = ROUTED_MODEL_PROVIDER_ID ? `${ROUTED_MODEL_PROVIDER_ID}/` : "";
+const CHEAP = `${ROUTED_MODEL_PREFIX}qwen3.8-flash`;
 
 export const DEFAULT_ROUTING = {
     version: 1,
@@ -219,9 +248,10 @@ export const DEFAULT_ROUTING = {
     // file having to know the provider id.
     providerLabels: { ...DEFAULT_PROVIDER_LABELS },
     roles: {
-        plan: { model: "claude-opus-5.5", effort: "high" },
+        orchestrate: { model: `${ROUTED_MODEL_PREFIX}deepseek-v4-flash`, effort: "high" },
+        plan: { model: `${ROUTED_MODEL_PREFIX}glm5.3-flash`, effort: "max" },
         execute: { model: CHEAP, effort: "low" },
-        verify: { model: CHEAP_ALT, effort: "medium" },
+        verify: { model: `${ROUTED_MODEL_PREFIX}mimo-v2.6-flash`, effort: "medium" },
     },
     // Applied to the live session through session.rpc.tools.updateSubagentSettings.
     //
@@ -276,12 +306,11 @@ async function detectedCatalog() {
 
 /**
  * First-run defaults derived from whatever catalog this machine actually has, so
- * a fresh install sends bulk work to the cheapest model it can see instead of a
- * hardcoded one, and planning to the best-scoring Copilot model it can see.
+ * a fresh install prefers the four configured stage models even when they are
+ * not currently in the catalog, rather than silently routing to another model.
  * Falls back to DEFAULT_ROUTING when there is no catalog to choose from.
  *
- * This is what keeps the published defaults free of any personal provider id or
- * model name: they are resolved from the machine, not from the repository.
+ * Existing persisted roles are merged separately and are never replaced here.
  */
 export function defaultRoutingFor(catalog = []) {
     const models = catalog.flatMap((group) => group.models ?? []);
@@ -289,22 +318,21 @@ export function defaultRoutingFor(catalog = []) {
 
     const ranked = [...models].sort((a, b) => cheapness(a) - cheapness(b));
     const execute = ranked[0].id;
-    const verifyRow =
-        ranked.find((model) => model.id !== execute && model.bench?.total) ??
-        ranked.find((model) => model.id !== execute) ??
-        ranked[0];
-
-    const byQuality = models
-        .filter((model) => !model.external && typeof model.bench?.total === "number")
-        .sort((a, b) => b.bench.total - a.bench.total);
-    const planRow = byQuality[0] ?? models.find((model) => EXPENSIVE_TIERS.has(model.tier)) ?? models[0];
+    const stageModel = (role) => {
+        const preferred = DEFAULT_ROUTING.roles[role].model;
+        return models.find((model) => model.id === preferred)?.id ??
+            models.find((model) => model.id.endsWith(`/${preferred.split("/").pop()}`))?.id ??
+            preferred;
+    };
+    const executeModel = stageModel("execute");
 
     return {
         ...DEFAULT_ROUTING,
         roles: {
-            plan: { model: planRow.id, effort: "high" },
-            execute: { model: execute, effort: "low" },
-            verify: { model: verifyRow.id, effort: "medium" },
+            orchestrate: { model: stageModel("orchestrate"), effort: "high" },
+            plan: { model: stageModel("plan"), effort: "max" },
+            execute: { model: executeModel, effort: "low" },
+            verify: { model: stageModel("verify"), effort: "medium" },
         },
         subagents: {
             ...DEFAULT_ROUTING.subagents,
@@ -312,7 +340,7 @@ export function defaultRoutingFor(catalog = []) {
                 BUILTIN_SUBAGENT_TYPES.map((type) => [
                     type,
                     {
-                        model: execute,
+                        model: executeModel,
                         effortLevel: "low",
                         contextTier: "inherit",
                         modelPolicy: "required",
@@ -373,7 +401,9 @@ export function policyProse(routing, catalog = []) {    const agents = BUILTIN_S
     return [
         "<model-routing-policy>",
         "Model routing is configured for this machine. Follow it instead of leaving model choice to Auto.",
-        `- Planning / architecture / hard reasoning -> ${routing.roles.plan.model}`,
+        `- Orchestration / task decomposition / planning targets -> ${routing.roles.orchestrate.model} (reasoning effort: ${routing.roles.orchestrate.effort})`,
+        "Orchestrate produces decomposition and targets for Plan; it must not implement changes.",
+        `- Detailed planning / architecture / hard reasoning -> ${routing.roles.plan.model} (reasoning effort: ${routing.roles.plan.effort})`,
         `- Bulk execution, searching, summarizing, mechanical edits -> ${routing.roles.execute.model}`,
         `- Verification and cross-checking -> ${routing.roles.verify.model}`,
         "Pinned subagent types:",
@@ -423,7 +453,7 @@ function mergeRouting(base, patch, { replaceAgentEntries = false } = {}) {
             else if (typeof label === "string" && label.trim()) out.providerLabels[id] = label.trim();
         }
     }
-    for (const role of ["plan", "execute", "verify"]) {
+    for (const role of WORKFLOW_ROLES) {
         if (patch.roles?.[role]) out.roles[role] = { ...out.roles[role], ...patch.roles[role] };
     }
     if (patch.subagents?.agents) {

@@ -2,8 +2,8 @@
 //
 // Three things in one extension:
 //   1. A canvas panel showing and editing the model routing policy.
-//   2. The "plan-then-execute" Dynamic Workflow: a premium model plans, cheap
-//      models execute in parallel, a third model verifies.
+//   2. The "plan-then-execute" Dynamic Workflow: orchestrate, plan, execute,
+//      and independently verify using four configured stage models.
 //   3. Session-start wiring that pins the subagent models on the live session
 //      and tells the agent which model to use for what.
 //
@@ -22,6 +22,7 @@ import {
     EFFORT_LEVELS,
     MODEL_POLICIES,
     buildFallbackCatalog,
+    catalogDiagnostics,
     loadRouting,
     normalizeCatalog,
     policyProse,
@@ -139,7 +140,7 @@ async function fetchCatalog(session, { refresh = false, providerLabels, refreshD
         catalogCache.value = {
             providers,
             source: "live",
-            fetchedAt: new Date(now).toISOString(),
+            fetchedAt: new Date().toISOString(),
             data: enrichment.meta,
             dataSource: enrichment.source,
         };
@@ -152,7 +153,10 @@ async function fetchCatalog(session, { refresh = false, providerLabels, refreshD
         catalogCache.value = {
             providers: buildFallbackCatalog(labels),
             source: "fallback",
-            fetchedAt: new Date(now).toISOString(),
+            fetchedAt: new Date().toISOString(),
+            diagnostic:
+                "The session model-list RPC failed or returned no model entries; see the extension log for the runtime error. " +
+                "The fallback catalog is display-only and cannot confirm availability.",
             data: enrichment.meta,
             dataSource: enrichment.source,
         };
@@ -213,7 +217,7 @@ async function startServer(session) {
                 refresh: url.searchParams.get("refresh") === "1",
                 providerLabels: routing.providerLabels,
             });
-            sendJson(res, 200, { catalog });
+            sendJson(res, 200, { catalog, diagnostics: catalogDiagnostics(routing, catalog) });
             return;
         }
 
@@ -268,6 +272,7 @@ async function startServer(session) {
                 renderHtml({
                     routing,
                     catalog,
+                    catalogDiagnostics: catalogDiagnostics(routing, catalog),
                     benchmarks,
                     effortLevels: EFFORT_LEVELS,
                     subagentTypes: BUILTIN_SUBAGENT_TYPES,
@@ -303,12 +308,12 @@ const session = await joinSession({
             id: "model-router",
             displayName: "Model Router",
             description:
-                "Shows and edits which model handles planning, bulk execution, verification, and each pinned subagent type.",
+                "Shows and edits which model handles orchestration, planning, bulk execution, verification, and each pinned subagent type.",
             inputSchema: { type: "object", properties: {} },
             actions: [
                 {
                     name: "get_routing",
-                    description: "Read the current model routing policy and the available model catalog.",
+                    description: "Read routing and the models exposed by this session's runtime, with configured-role availability diagnostics.",
                     handler: async () => {
                         const routing = await loadRouting();
                         const catalog = await fetchCatalog(session, {
@@ -317,6 +322,7 @@ const session = await joinSession({
                         return {
                             routing,
                             catalog,
+                            diagnostics: catalogDiagnostics(routing, catalog),
                             subagentTypes: BUILTIN_SUBAGENT_TYPES,
                             modelPolicies: MODEL_POLICIES,
                         };
@@ -325,7 +331,7 @@ const session = await joinSession({
                 {
                     name: "get_catalog",
                     description:
-                        "List the models and providers available to this session, read live from the runtime.",
+                        "List models exposed by this session runtime. This does not read app provider settings or verify provider credentials.",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -337,10 +343,11 @@ const session = await joinSession({
                     },
                     handler: async (ctx) => {
                         const routing = await loadRouting();
-                        return await fetchCatalog(session, {
+                        const catalog = await fetchCatalog(session, {
                             refresh: ctx.input?.refresh === true,
                             providerLabels: routing.providerLabels,
                         });
+                        return { ...catalog, diagnostics: catalogDiagnostics(routing, catalog) };
                     },
                 },
                 {
@@ -377,7 +384,7 @@ const session = await joinSession({
                 {
                     name: "set_routing",
                     description:
-                        "Merge a routing patch. Shape: { roles?: { plan|execute|verify: { model, effort } }, " +
+                        "Merge a routing patch. Shape: { roles?: { orchestrate|plan|execute|verify: { model, effort } }, " +
                         "subagents?: { agents?: { <type>: { model, effortLevel, contextTier, modelPolicy } }, " +
                         "maxConcurrency?, maxDepth? } }.",
                     inputSchema: { type: "object", properties: {} },
