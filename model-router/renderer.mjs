@@ -387,10 +387,11 @@ const BODY = `
 <section class="panel" data-panel="routing" data-active="true">
   <div class="banner" id="filterBanner" style="display:none"></div>
   <div class="section">
-    <h2>Roles del workflow</h2>
+    <h2>Workflow roles</h2>
     <p class="sub">
-      El workflow <span class="mono">plan → execute → verify</span> reparte el trabajo en tres momentos.
-      Aquí decides qué modelo y con qué esfuerzo atiende cada uno.
+      The workflow <span class="mono">orchestrate → plan → execute → verify</span> has four stages.
+      Orchestrate decomposes the task and supplies targets to Plan; it does not implement changes.
+      Choose the model and reasoning effort for each stage here.
     </p>
     <div id="roles"></div>
   </div>
@@ -412,10 +413,36 @@ const BODY = `
 
 <section class="panel" data-panel="catalog">
   <div class="section">
-    <h2>Catálogo en vivo</h2>
-    <p class="sub" id="catalogSub">Se lee del propio runtime, así que refleja exactamente los modelos que tienes disponibles.</p>
+    <h2>Live session catalog and route diagnostics</h2>
+    <p class="sub" id="catalogSub">Models reported by the current session runtime. This is not a provider registry or credential test.</p>
+    <div class="bar-top" style="margin-bottom:10px">
+      <button id="refreshCatalog">Refresh live model list</button>
+      <span id="catalogRefreshStatus" class="status"></span>
+    </div>
+    <div id="catalogDiagnostics"></div>
     <div id="catalogMeta" class="note"></div>
     <div class="tablewrap"><table id="catalogTable"></table></div>
+  </div>
+  <div class="section">
+    <h2>Add or verify a model provider</h2>
+    <p class="sub">
+      In the GitHub Copilot desktop app, open <strong>Settings → Model providers → Add provider</strong>,
+      save the provider, then select one of its models in the app's model picker. Provider credentials
+      are managed by the app. Refresh this catalog from the current session; a provider shown in app
+      settings but missing here is not exposed by this session's model-list RPC.
+    </p>
+    <p class="sub">
+      For the standalone Copilot CLI, configure <code>~/.copilot/providers.json</code> (or the path
+      in <code>COPILOT_PROVIDERS_CONFIG</code>) and restart the CLI. The CLI's provider file stores
+      credentials as plain text; keep it private and never commit it. Provider registration and a
+      model ID in this router do not prove that the current session can invoke that model.
+    </p>
+    <p class="sub">
+      See GitHub's official guides:
+      <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">Copilot app providers</a>
+      and
+      <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">Copilot CLI providers</a>.
+    </p>
   </div>
   <div class="section">
     <h2>Columnas</h2>
@@ -524,7 +551,7 @@ const BODY = `
       <dt>Tamaño de la esfera</dt>
       <dd>Nota global: cuanto más grande, mejor.</dd>
       <dt>Color</dt>
-      <dd>Fabricante. Las esferas con halo son los modelos que tienes disponibles ahora mismo.</dd>
+      <dd>Vendor. A halo marks models listed by this session's live model RPC; it does not confirm credentials or successful inference.</dd>
       <dt>Filtros del mapa</dt>
       <dd>
         <b>Solo mis modelos</b> arranca activado y deja en pantalla únicamente los modelos que puedes elegir, igual que
@@ -578,10 +605,11 @@ const BODY = `
  * @param {string[]} options.subagentTypes
  * @param {string[]} options.modelPolicies
  */
-export function renderHtml({ routing, catalog, benchmarks, effortLevels, subagentTypes, modelPolicies }) {
+export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, effortLevels, subagentTypes, modelPolicies }) {
     const boot = {
         routing,
         catalog,
+        catalogDiagnostics,
         benchmarks: benchmarks ?? { rows: [], meta: null, source: "none" },
         effortLevels,
         subagentTypes,
@@ -613,7 +641,9 @@ ${CLIENT}
 
 const CLIENT = String.raw`
 var state = JSON.parse(JSON.stringify(BOOT.routing));
-var catalog = catalogGroups(BOOT.catalog);
+var catalogSnapshot = BOOT.catalog || {};
+var catalogDiagnostics = BOOT.catalogDiagnostics || {};
+var catalog = catalogGroups(catalogSnapshot);
 var benchRows = (BOOT.benchmarks && BOOT.benchmarks.rows) || [];
 var benchMeta = (BOOT.benchmarks && BOOT.benchmarks.meta) || null;
 var benchSource = (BOOT.benchmarks && BOOT.benchmarks.source) || "none";
@@ -1268,16 +1298,16 @@ function selectFrom(values, current, onChange) {
 
 function renderRoles() {
   var host = clear("roles");
-  ["plan", "execute", "verify"].forEach(function (role) {
+  ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
     var entry = (state.roles && state.roles[role]) || {};
-    var row = el("div", { className: "meter", style: { gridTemplateColumns: "76px minmax(0, 2.2fr) minmax(0, 1fr)" } }, [
+    var row = el("div", { className: "meter", style: { gridTemplateColumns: "100px minmax(0, 2.2fr) minmax(0, 1fr)" } }, [
       el("strong", { textContent: role }),
       modelSelect(entry.model, function (value) {
-        state.roles[role] = Object.assign({}, entry, { model: value });
+        state.roles[role] = Object.assign({}, state.roles[role], { model: value });
         markDirty();
       }),
       selectFrom(effortLevels, entry.effort, function (value) {
-        state.roles[role] = Object.assign({}, entry, { effort: value });
+        state.roles[role] = Object.assign({}, state.roles[role], { effort: value });
         markDirty();
       })
     ]);
@@ -1365,13 +1395,15 @@ function renderRoutingDefs() {
 // --- catalog tab ------------------------------------------------------------
 
 function renderCatalog() {
+  renderCatalogDiagnostics();
   var table = clear("catalogTable");
   var head = el("thead");
   head.append(el("tr", null, [
-    el("th", { textContent: "Modelo" }),
-    el("th", { textContent: "Proveedor" }),
+    el("th", { textContent: "Model" }),
+    el("th", { textContent: "Exact runtime ID" }),
+    el("th", { textContent: "Provider label / runtime ID" }),
     el("th", { textContent: "Fabricante" }),
-    el("th", { textContent: "Origen del dato", className: "tiny" }),
+    el("th", { textContent: "Vendor metadata source", className: "tiny" }),
     el("th", { textContent: "Precio" }),
     el("th", { textContent: "Contexto" }),
     el("th", { textContent: "Global", className: "num" })
@@ -1381,7 +1413,7 @@ function renderCatalog() {
   var body = el("tbody");
   catalog.forEach(function (group) {
     body.append(el("tr", null, [
-      el("td", { colSpan: 7, className: "small muted", textContent: group.label + " — " + group.models.length + " modelos" })
+      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + " models" })
     ]));
     group.models.forEach(function (model) {
       var origin = model.vendorSource === "runtime" ? "runtime"
@@ -1390,11 +1422,9 @@ function renderCatalog() {
         : model.vendorSource === "heuristic" ? "inferido por nombre"
         : "desconocido";
       body.append(el("tr", null, [
-        el("td", null, [
-          el("div", { className: "mono", textContent: model.label }),
-          model.id !== model.label ? el("div", { className: "tiny muted", textContent: model.id }) : null
-        ]),
-        el("td", { className: "small", textContent: group.label }),
+        el("td", { className: "small", textContent: model.label }),
+        el("td", { className: "tiny mono", textContent: model.id }),
+        el("td", { className: "small mono", textContent: group.label + " / " + group.id }),
         el("td", { className: "small" }, [
           el("span", { className: "dot", style: { background: vendorColor(vendorOf(model)) } }),
           el("span", { textContent: " " + vendorOf(model) })
@@ -1409,19 +1439,65 @@ function renderCatalog() {
   table.append(body);
 
   var external = allModels().filter(function (model) { return model.external; }).length;
-  document.getElementById("catalogSub").textContent =
-    allModels().length + " modelos en " + catalog.length + " proveedor(es), de los cuales " + external +
-    " vienen de una clave propia. Se leen del propio runtime, así que reflejan exactamente lo que tienes disponible.";
+  var sourceIsLive = catalogSnapshot.source === "live";
+  document.getElementById("catalogSub").textContent = sourceIsLive
+    ? allModels().length + " models across " + catalog.length + " providers (" + external +
+      " provider-qualified IDs) reported by this session runtime. Listing is not a credential or inference test."
+    : "The live session model list is unavailable; the fallback catalog is shown and cannot confirm model availability.";
 
   var withVendor = allModels().filter(function (model) { return model.vendor; }).length;
   document.getElementById("catalogMeta").textContent =
-    "Fabricante identificado en " + withVendor + " de " + allModels().length + " modelos. " +
-    "El dato sale del runtime cuando lo trae, y si no se busca en la instantánea pública; " +
-    "cuando tampoco está ahí se infiere por familia o por el nombre del identificador.";
+    "Vendor metadata identified for " + withVendor + " of " + allModels().length + " models. " +
+    "This metadata comes from the runtime or public snapshot and does not indicate provider registration or callability.";
+}
+
+function renderCatalogDiagnostics() {
+  var host = clear("catalogDiagnostics");
+  var live = catalogSnapshot.source === "live";
+  var knownIds = new Set(allModels().map(function (model) { return model.id; }));
+  var rows = [["Stage", "Configured model ID", "Session runtime status"]];
+  ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
+    var model = state.roles && state.roles[role] && state.roles[role].model || "";
+    var status = !live ? "Unknown — fallback catalog"
+      : knownIds.has(model) ? "Listed by live runtime"
+      : "Not exposed by this session";
+    rows.push([role, model || "(not configured)", status]);
+  });
+  var sourceText = live
+    ? "Source: session.rpc.model.list() — live session runtime"
+    : "Source: fallback catalog — live availability could not be confirmed";
+  var checkedText = catalogDiagnostics.fetchedAt
+    ? "Last checked: " + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
+    : "Last checked: unknown";
+  host.append(el("p", { className: "note", textContent: sourceText + ". " + checkedText +
+    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + " model(s) across " +
+    (catalogDiagnostics.providers || []).length + " provider(s)." }));
+  if (!live) {
+    host.append(el("p", { className: "note", textContent:
+      catalogSnapshot.diagnostic || "The live model-list request failed or returned no models; see the extension log for details. The fallback catalog is display-only and cannot confirm availability." }));
+  }
+  host.append(el("p", { className: "note", textContent:
+    "“Listed by live runtime” means the current session reports the exact ID; it does not verify provider credentials or a successful inference request. “Not exposed” does not mean the model is absent from app settings or a provider registry." }));
+  var table = el("table");
+  var head = el("thead");
+  head.append(el("tr", null, rows[0].map(function (text) { return el("th", { textContent: text }); })));
+  table.append(head);
+  var body = el("tbody");
+  rows.slice(1).forEach(function (row) {
+    body.append(el("tr", null, [
+      el("td", { className: "mono", textContent: row[0] }),
+      el("td", { className: "tiny mono", textContent: row[1] }),
+      el("td", { className: "small", textContent: row[2] })
+    ]));
+  });
+  table.append(body);
+  host.append(el("div", { className: "tablewrap" }, table));
 }
 
 function renderCatalogDefs() {
   defs("catalogDefs", [
+    ["Session runtime status", "Only an exact model ID present in a successful live session model list is marked as listed. This is not a credential, endpoint, or inference test."],
+    ["Fallback catalog", "A display-only list used when the session model list is unavailable. It never confirms a configured workflow model is available."],
     ["Proveedor", "Quién sirve el modelo. GitHub Copilot, o el proveedor externo cuya clave tengas configurada."],
     ["Fabricante", "Quién lo construyó. Se muestra aparte del proveedor porque un mismo fabricante puede llegar por varias vías."],
     ["Origen del dato", "De dónde ha salido el fabricante: del runtime, de la instantánea pública, de la familia del modelo o de una heurística sobre el identificador."],
@@ -1785,7 +1861,7 @@ function renderBenchTable() {
   var sub = rows.length + " de " + scored.length + " modelos con notas" +
     (onlyMine ? " · solo los que puedes elegir" : " · todo el campo público") +
     (limit ? " · filtrados" : "") + ".";
-  if (!onlyMine) sub += " Las filas resaltadas son modelos que tienes disponibles.";
+  if (!onlyMine) sub += " Las highlighted rows are model IDs listed by this session's live model RPC; this does not verify provider credentials or successful inference.";
   if (estimatedShown) sub += " Los marcados con ~ son estimaciones por familia, no medidas directas.";
   document.getElementById("benchSub").textContent = sub;
 }
@@ -2379,10 +2455,10 @@ function wireSceneButtons() {
 
 function renderGuide() {
   defs("guideDefs", [
-    ["Enrutado", "Aquí eliges qué modelo atiende cada papel: los tres roles del workflow (planificar, ejecutar, verificar) y los subagentes que lanza el agente principal."],
+    ["Routing", "Choose models for the four workflow stages (orchestrate, plan, execute, verify) and for the subagents launched by the main agent. Orchestrate prepares decomposition and targets; Plan details implementation; only Execute implements changes."],
     ["Exigencia (modelPolicy)", "Decide si el modelo fijado es obligatorio (required), una simple sugerencia (preferred) o si no opinas (inherit). Es lo que evita que una llamada suelta se vaya a un modelo caro sin que te enteres."],
     ["Esfuerzo (effort)", "Cuánto piensa el modelo antes de contestar. Más esfuerzo resuelve mejor lo difícil y cuesta más por llamada; menos esfuerzo responde antes y gasta menos."],
-    ["Catálogo", "Los modelos que tienes disponibles de verdad, leídos del runtime. Incluye el fabricante, la categoría de precio, el contexto y su nota global."],
+    ["Catalog", "The model IDs reported by this session's model-list RPC. This list does not inspect provider settings or credentials and does not guarantee inference will succeed. It includes vendor, price category, context, and public benchmark score when available."],
     ["Comparativa", "La parte educativa: para cada tipo de tarea te dice qué modelo sale mejor y por qué, con las notas públicas de benchmarks y el precio al lado."],
     ["Benchmark", "Una prueba estandarizada con la que se mide a los modelos. Ninguno gana en todo: hay quien escribe mejor código y quien razona mejor. Por eso la recomendación cambia según la tarea."],
     ["Fabricante frente a proveedor", "El proveedor es quien te sirve el modelo (GitHub Copilot o tu proveedor externo). El fabricante es quien lo construyó (Anthropic, OpenAI, Alibaba…). Un mismo fabricante puede llegarte por las dos vías."],
@@ -2462,7 +2538,11 @@ async function refreshData() {
   setStatus("Actualizando catálogo y datos públicos…");
   try {
     var payload = await (await fetch("/catalog?refresh=1")).json();
-    if (payload.catalog) catalog = catalogGroups(payload.catalog);
+    if (payload.catalog) {
+      catalogSnapshot = payload.catalog;
+      catalogDiagnostics = payload.diagnostics || {};
+      catalog = catalogGroups(payload.catalog);
+    }
     var data = await (await fetch("/data?refresh=1")).json();
     if (data.rows) benchRows = data.rows;
     if (data.meta) benchMeta = data.meta;
@@ -2473,6 +2553,28 @@ async function refreshData() {
     renderAll();
   } catch (error) {
     setStatus("No se pudo actualizar: " + error.message, "err");
+  }
+}
+
+async function refreshCatalog() {
+  var status = document.getElementById("catalogRefreshStatus");
+  status.textContent = "Refreshing session model list…";
+  status.dataset.tone = "";
+  try {
+    var response = await fetch("/catalog?refresh=1");
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    var payload = await response.json();
+    catalogSnapshot = payload.catalog || {};
+    catalogDiagnostics = payload.diagnostics || {};
+    catalog = catalogGroups(catalogSnapshot);
+    status.textContent = catalogSnapshot.source === "live"
+      ? "Session model list refreshed."
+      : "Refresh completed, but only the fallback catalog is available.";
+    status.dataset.tone = catalogSnapshot.source === "live" ? "ok" : "warn";
+    renderAll();
+  } catch (error) {
+    status.textContent = "Could not refresh model list: " + error.message;
+    status.dataset.tone = "err";
   }
 }
 
@@ -2512,6 +2614,7 @@ document.getElementById("tabs").addEventListener("click", function (event) {
 document.getElementById("apply").addEventListener("click", applyRouting);
 document.getElementById("reset").addEventListener("click", resetRouting);
 document.getElementById("refresh").addEventListener("click", refreshData);
+document.getElementById("refreshCatalog").addEventListener("click", refreshCatalog);
 
 window.addEventListener("beforeunload", function (event) {
   if (!dirty) return;

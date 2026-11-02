@@ -8,36 +8,42 @@ premium por culpa de `Auto`.
 
 | Pieza | Qué hace |
 | --- | --- |
-| Panel **Model Router** | Eliges el modelo y el esfuerzo para planificar / ejecutar / verificar, y fijas el modelo **y la obligatoriedad** de cada subagente. Se explica a sí mismo dentro del panel. Interfaz con pestañas segmentadas con iconos, tarjetas, chips y medidores; el botón **Restablecer** es rojo (acción destructiva) y la interfaz respeta `prefers-reduced-motion`. |
+| **Model Router** canvas | Configure the model and reasoning effort for Orchestrate, Plan, Execute, and Verify, and pin a model and enforcement policy for each subagent. |
 | Catálogo de modelos | Se lee en vivo de la sesión, así que refleja tu plan y tus proveedores reales. |
 | Pestaña **Comparativa** | Ranking de benchmarks públicos, gráfico calidad/precio, una recomendación por tipo de subagente y **filtros por proveedor y por modelo**. |
 | Pestaña **3D** | Mapa tridimensional de los 88 modelos medidos (calidad, precio y velocidad) con marco de referencia, rejilla y etiquetas de eje. Arranca solo con los modelos que puedes elegir y tiene filtros propios por estimadas, sin precio y fabricante. Solo se carga al abrir la pestaña. |
-| Workflow `plan-then-execute` | Un modelo caro planifica, modelos baratos ejecutan en paralelo, un tercer modelo verifica. |
+| Workflow `plan-then-execute` | Orchestrate decomposes the task and supplies targets; Plan creates a detailed plan; Execute works in parallel; Verify independently checks the results. |
 | Ajustes de subagentes | Se aplican a la sesión viva vía `session.rpc.tools.updateSubagentSettings`. |
 | Bloque de política | Al iniciar sesión se inyecta `<model-routing-policy>` para que el agente enrute a propósito. |
 | Instantánea de datos | `model-router/data/models-enriched.json`: fabricante, precio, notas de benchmark y velocidad de 371 modelos, regenerada cada semana por un GitHub Action. |
 
-## Reparto por defecto
+## Default workflow routing
 
-En una instalación nueva, los valores iniciales **no están escritos a mano**: se derivan
-del catálogo que detecte tu sesión.
+The four workflow roles use these model IDs by default. They remain configured even if
+the current live catalog does not list them; the workflow does not silently substitute a
+different model. A user can still override each model from the canvas or workflow args.
 
-| Rol | Regla | Ejemplo |
+| Stage | Model | Reasoning effort |
 | --- | --- | --- |
-| Planificar | el modelo de Copilot con mejor nota pública (si no hay notas, el primero de gama alta) | `claude-opus-5.5` |
-| Ejecutar | el modelo más barato disponible, con esfuerzo `low` | `<proveedor>/mimo-v2.6-flash` |
-| Verificar | el segundo más barato, con esfuerzo `medium` | `<proveedor>/glm5.3-flash` |
+| Orchestrate | `deepseek-v4-flash` | `high` |
+| Plan | `glm5.3-flash` | `max` |
+| Execute | `qwen3.8-flash` | `low` |
+| Verify | `mimo-v2.6-flash` | `medium` |
 
-Los seis subagentes integrados (`explore`, `task`, `general-purpose`, `code-review`,
-`research`, `security-review`) se fijan al modelo de ejecución con `contextTier: inherit`
-y `modelPolicy: "required"`.
+Orchestrate produces a task decomposition and targets for Plan only. It must not implement
+changes. Plan receives the orchestration summary and targets, then produces a detailed,
+implementation-ready plan. When explicit targets are provided, they remain the Execute
+units and are also included in the planning targets.
+Orchestrated targets are required to be self-contained and pairwise non-overlapping;
+dependent or conflicting changes must be grouped into one target before Execute runs
+its units in parallel.
 
-Así el repositorio público no lleva ningún id de proveedor ni ningún nombre de empresa:
-cada máquina se configura con lo que tenga delante. Si el catálogo no se puede leer, se
-usa una lista mínima de reserva (`claude-opus-5.5` / `claude-haiku-5.5` / `gpt-5.4-mini`).
+The six built-in subagents (`explore`, `task`, `general-purpose`, `code-review`,
+`research`, `security-review`) retain their independently configured routing. Missing
+Orchestrate settings in older `routing.json` files are filled from the defaults without
+replacing existing Plan, Execute, Verify, or subagent settings.
 
-> **Restaurar por defecto** sobrescribe la configuración guardada con esos valores
-> derivados del catálogo, así que **pierdes las fijaciones que hayas afinado a mano**.
+Resetting routing writes the built-in defaults and replaces customized role settings.
 
 ### Columna *Enforcement*
 
@@ -68,23 +74,38 @@ Orden de resolución, de mayor a menor prioridad:
   fijación es solo una sugerencia y el agente puede escalar a un modelo premium.
 - `"required"` → el override del paso 1 se rechaza; siempre se usa el modelo fijado.
 
-## Catálogo de modelos
+## Session catalog and model diagnostics
 
-El panel no lleva una lista de modelos escrita a mano: se la pide a la sesión con
-`session.rpc.model.list()`, así que aparecen los modelos de tu plan y los del
-proveedor externo con el nombre y el coste que ve la propia app.
+The **Catalog** canvas tab shows the exact model IDs and provider labels returned by
+the current session's `session.rpc.model.list()`, the catalog source, and its last
+refresh timestamp. A diagnostics table compares each configured workflow role against
+that list. **Listed by live runtime** means the exact ID was returned by the session;
+it does not test credentials, endpoint connectivity, or inference. **Not exposed by this
+session** means only that this session's list omitted it; it does not prove that the
+provider or model is absent from the desktop app's settings.
 
-- `tier` es el coste relativo en tokens: `low`, `medium`, `high` o `very_high`.
-- Los modelos del proveedor externo se reconocen por la forma de su id
-  (`<proveedor>/<modelo>`) y salen con `tier: byok`: no se facturan contra el plan de
-  Copilot. No hay ningún id de proveedor que mantener.
-- El botón **Refresh** fuerza una relectura sin caché.
-- Si la llamada falla (sesión sin autenticar, runtime antiguo) el panel muestra una
-  lista mínima de reserva y lo indica.
+The refresh button bypasses the extension's catalog cache. If the RPC fails, the
+fallback catalog is explicitly marked as display-only and all role availability is
+reported as unknown rather than available.
 
-El bloque de política que se inyecta en la sesión se construye con ese mismo catálogo,
-así que nombra explícitamente los modelos caros que conviene evitar y los gratuitos que
-conviene usar para trabajo masivo.
+The Copilot SDK documentation describes `onListModels` as a callback on a
+`CopilotClient` instance. It replaces that client's `models.list` RPC, but this extension
+joins an already-running session; it cannot register a callback on the app-owned client.
+The current extension API also does not expose a supported provider-registry or
+credential-store reader. Therefore provider settings cannot be used here as evidence
+that this session can invoke a model.
+
+The policy injected into the session uses the saved model IDs and settings; the live
+catalog is diagnostic only and never silently substitutes a different model.
+
+To add providers, open **Settings → Model providers → Add provider** in the GitHub
+Copilot desktop app, save its endpoint and model, then select that model in the app's
+model picker. For the standalone CLI, add provider and model entries to
+`~/.copilot/providers.json` (or configure `COPILOT_PROVIDERS_CONFIG`) and restart the
+CLI. The CLI configuration can contain plaintext credentials; keep it private and do
+not commit or copy credentials into this extension. See the [Copilot app
+guide](https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models)
+and [Copilot CLI guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models).
 
 ### Fabricante, precio y notas de benchmark
 
@@ -244,8 +265,9 @@ modelos compiten, no la escala.
 
 Cada modelo medido es una esfera: **X** es el precio en escala logarítmica, **Y** la nota
 global y **Z** la velocidad en tokens por segundo. El color es el fabricante, el tamaño
-la nota global, y las esferas con **halo** son los modelos que tienes disponibles ahora
-mismo. Los que quedan fuera del filtro de arriba se atenúan.
+la nota global, y las esferas con **halo** son los modelos listados por el RPC del runtime
+de esta sesión. El halo no verifica credenciales ni garantiza que una inferencia funcione.
+Los que quedan fuera del filtro de arriba se atenúan.
 
 El mapa **arranca mostrando solo los modelos que puedes elegir**, igual que la tabla: son
 23 esferas de las 87 posibles. Si quieres ver el campo público completo, desactiva
@@ -306,21 +328,24 @@ afecta, y debajo de **Roles del workflow** y **Subagentes fijados** hay una list
 significado de *Effort* (presupuesto de razonamiento del modelo) y de cada valor de
 *Enforcement* (`required` / `preferred` / `inherit`).
 
-Para el flujo caro/barato, invoca el workflow:
+Invoke the four-stage workflow with:
 
 ```
 plan-then-execute
 args: {
-  "task": "lo que hay que hacer",
-  "targets": ["unidad 1", "unidad 2"],
-  "planModel": "...",     // opcional, por defecto el del panel
-  "workerModel": "...",   // opcional
-  "verifyModel": "...",   // opcional
-  "verify": true          // opcional
+  "task": "Implement the requested feature",
+  "targets": ["optional execution unit"],
+  "orchestrateModel": "...",
+  "planModel": "...",
+  "workerModel": "...",
+  "verifyModel": "...",
+  "verify": true
 }
 ```
 
-Sin `targets` el workflow usa `[task]` como única unidad de trabajo.
+All model overrides are optional and default to the saved routing configuration.
+Without `targets`, Orchestrate's decomposition targets become the Execute units.
+The routing regression tests run with `node --test model-router/test/*.test.mjs`.
 
 ## Configuración
 
@@ -405,23 +430,37 @@ setx MODEL_ROUTER_PROVIDER_LABEL "Nombre visible"
   hacen falta los dos ficheros y se sirven desde el propio servidor local del panel.
 - `model-router/data/models-enriched.json` es la instantánea que se commitea. No la
   añadas a `.gitignore`: es el respaldo que hace que el panel funcione recién instalado.
-- El repositorio **no** contiene ningún id de proveedor, ningún nombre comercial ni tu
-  login. El nombre visible de un proveedor externo se guarda solo en tu máquina
-  (`artifacts/routing.json`); si no le pones uno, el panel lo llama
-  *"Proveedor externo &lt;prefijo&gt;"* en lugar de mostrar el identificador crudo.
+- The four workflow defaults include the provider-qualified model IDs listed above;
+  no provider credentials are stored in the repository. A custom provider display
+  name is saved only on the local machine in `artifacts/routing.json`.
 
-## Dónde aplica
+## Runtime availability
 
-| Capa | App de escritorio | Copilot CLI (terminal) |
+| Capability | Copilot desktop app | Standalone Copilot CLI |
 | --- | --- | --- |
-| Panel (canvas) | ✅ | ❌ no hay panel en una TUI |
-| Workflow `plan-then-execute` | ✅ | ✅ |
-| Hook `onSessionStart` (política) | ✅ | ✅ |
-| `updateSubagentSettings` (fijación real) | ✅ | ✅ |
+| Canvas panel | ✅ | ❌ |
+| Workflow `plan-then-execute` | ✅ | ✅, if the configured models are available |
+| `onSessionStart` routing policy | ✅ | ✅ |
+| `updateSubagentSettings` pins | ✅ | ✅ |
 
-La app de escritorio **embebe** el mismo Copilot CLI, así que ambos leen `~/.copilot`.
-`gh` (GitHub CLI) no interviene en la elección de modelos; `gh copilot` es solo un
-wrapper que lanza el binario `copilot`.
+The desktop app and standalone CLI do not necessarily expose the same live model
+catalog. A routing entry does not register a provider or make its models available:
+the workflow uses the configured model ID and can fail before inference if the
+runtime does not offer it. This session's `session.rpc.model.list()` returned only
+GitHub Copilot models even though the app's provider settings contained the requested
+provider/model records. The standalone CLI also rejected a requested model as
+unavailable, so end-to-end inference through either runtime was not verified.
 
-El workflow `plan-then-execute` no necesita `modelPolicy`: fija `model` explícitamente
-en cada llamada a `ctx.agent`, y `WorkflowAgentOptions` no admite `modelPolicy`.
+For standalone CLI BYOK, configure the provider and its models in
+`~/.copilot/providers.json` (or set `COPILOT_PROVIDERS_CONFIG` to another config
+file), then restart the CLI. Configure any provider-specific `COPILOT_PROVIDER_*`
+settings required by your integration in the process environment. Keep credentials
+private and never commit them. See
+[Adding LLM models to GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models)
+for the current provider configuration format.
+
+The desktop app embeds the Copilot CLI, but the available providers can still vary
+by session configuration. GitHub CLI (`gh`) does not choose the workflow models.
+
+The workflow does not use `modelPolicy`: each `ctx.agent` call explicitly sets its
+model, and `WorkflowAgentOptions` does not accept `modelPolicy`.
