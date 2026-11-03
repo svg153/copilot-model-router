@@ -659,6 +659,20 @@ async function main() {
         sources: Object.fromEntries([...DOWNLOADS].map(([url, digest]) => [url, { sha256: digest }])),
     };
     const manifestFile = join(dirname(OUT_FILE), "manifest.json");
+    // Same rule as the snapshot: when nothing substantive changed, keep the
+    // previous manifest timestamp so an unchanged build writes zero bytes of
+    // diff and the refresh workflow has nothing to open a PR for.
+    try {
+        const previousManifest = JSON.parse(await readFile(manifestFile, "utf8"));
+        const { generatedAt: _previousTimestamp, ...previousRest } = previousManifest;
+        const { generatedAt: _freshTimestamp, ...manifestRest } = manifest;
+        if (JSON.stringify(previousRest) === JSON.stringify(manifestRest)) {
+            manifest.generatedAt = previousManifest.generatedAt;
+            log("  no upstream change; keeping the previous manifest timestamp");
+        }
+    } catch {
+        // No previous manifest, or it is unreadable: write a fresh one.
+    }
     await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
     log("");
