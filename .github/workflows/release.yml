@@ -1,0 +1,97 @@
+# Publishes a tagged GitHub release of the model-router extension whenever
+# extension code lands on main (issue #36), so the locally installed copy never
+# goes stale without a downloadable artifact.
+#
+# Recursion guard: this workflow only fires for paths under model-router/**,
+# while the version-bump commit below touches only package.json at the repo
+# root — so the bump push cannot retrigger a release. The [skip ci] marker in
+# the bump message is belt and braces for pathless workflows (test.yml).
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "model-router/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate and commit version bump (bounded retry)
+        # Another commit landing on main between checkout and push would be
+        # rejected as non-fast-forward and the release would silently never
+        # publish (the concurrency group only serializes release runs, and a
+        # failed push run is never retriggered). So each attempt refreshes
+        # main, re-runs the same gates as test.yml against the fresh state,
+        # and recomputes the bump from the fresh package.json before pushing.
+        # Three attempts cover ordinary merge races; a persistent failure
+        # fails loudly instead of releasing stale code.
+        id: bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node scripts/build-data.mjs --verify
+            node --test model-router/test/*.test.mjs
+            NEXT=$(node scripts/release-version.mjs "$(node -p "require('./package.json').version")")
+            node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.NEXT;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+            git add package.json
+            git commit -m "chore(release): v${NEXT} [skip ci]"
+            if git push origin HEAD:main; then
+              echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+              echo "Released as v$NEXT"
+              exit 0
+            fi
+            echo "Push rejected — main advanced (attempt $attempt/3), retrying"
+          done
+          echo "::error::version bump push failed after 3 attempts"
+          exit 1
+
+      - name: Tag the bump commit
+        env:
+          NEXT: ${{ steps.bump.outputs.version }}
+        run: |
+          git tag -a "v${NEXT}" -m "model-router v${NEXT}"
+          git push origin "v${NEXT}"
+
+      - name: Package the extension zip
+        # Layout matches what a released install needs: extract anywhere and
+        # run ./install.ps1 (it installs ./model-router and reports the version
+        # from ./package.json).
+        env:
+          NEXT: ${{ steps.bump.outputs.version }}
+        run: |
+          mkdir dist
+          cp -r model-router dist/model-router
+          cp install.ps1 package.json dist/
+          cd dist
+          zip -qr "../model-router-v${NEXT}.zip" model-router install.ps1 package.json
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: ${{ steps.bump.outputs.version }}
+        run: |
+          gh release create "v${NEXT}" "model-router-v${NEXT}.zip" \
+            --title "model-router v${NEXT}" \
+            --generate-notes
