@@ -22,7 +22,7 @@ import { CLIENT_ACTIONS } from "./client-actions.mjs";
 const CLIENT = "\n" + [CLIENT_CORE, CLIENT_ROUTING, CLIENT_CATALOG, CLIENT_BENCH, CLIENT_SCENE, CLIENT_GUIDE, CLIENT_ACTIONS].join("\n") + "\n";
 
 /** Serialize a value for embedding inside an inline <script> block. */
-function escapeJsonForScript(value) {
+export function escapeJsonForScript(value) {
     return JSON.stringify(value ?? null)
         .replace(/</g, "\\u003c")
         .replace(/>/g, "\\u003e")
