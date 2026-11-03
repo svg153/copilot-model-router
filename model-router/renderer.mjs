@@ -448,7 +448,16 @@ const BODY = `
     <h2>Columnas</h2>
     <dl class="defs" id="catalogDefs"></dl>
   </div>
-</section>
+    <div class="section">
+      <h2>Etiquetas de proveedor</h2>
+      <p class="sub">
+        Asigna un nombre legible a cada proveedor externo. El ID (UUID o hostname) se usa internamente;
+        la etiqueta es lo que se muestra en la interfaz. Escribe el ID completo del proveedor y el nombre
+        que quieras; pulsa <strong>Agregar</strong> y luego <strong>Guardar y aplicar</strong> para que surta efecto.
+      </p>
+      <div id="providerLabelsEditor"></div>
+    </div>
+  </section>
 
 <section class="panel" data-panel="bench">
   <div class="section">
@@ -1071,10 +1080,18 @@ function renderFilterBanner() {
   clear("filterBanner");
   if (!filterActive()) { host.style.display = "none"; return; }
   host.style.display = "";
-  host.append(el("span", {
-    textContent: "Estas recomendaciones usan " + activeModels().length + " de " + allModels().length +
-      " modelos" + (filters.provider !== "all" ? " (" + providerLabel(filters.provider) + ")" : "") + "."
-  }));
+  var providerInfo = "";
+    if (filters.provider !== "all") {
+      var pid = filters.provider;
+      var plabel = providerLabel(pid);
+      // Show full provider ID when the label is a generated fallback (starts with "Proveedor externo").
+      var showId = plabel.indexOf("Proveedor externo") === 0;
+      providerInfo = " (" + plabel + (showId ? " — ID: " + pid + ")" : ")");
+    }
+    host.append(el("span", {
+      textContent: "Estas recomendaciones usan " + activeModels().length + " de " + allModels().length +
+        " modelos" + providerInfo + "."
+    }));
   host.append(el("button", {
     className: "toggle", type: "button", textContent: "Quitar filtros", onclick: clearFilters
   }));
@@ -1312,6 +1329,62 @@ function renderRoles() {
       })
     ]);
     host.append(row);
+
+    // Fallback chain row
+    var fallbackEntry = entry.fallback || [];
+    var fbRow = el("div", { className: "meter", style: { gridTemplateColumns: "100px 1fr auto", marginTop: "2px" } });
+    var fbLabel = el("span", { className: "tiny muted", textContent: "  └─ fallback" });
+    var fbContainer = el("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" } });
+    var fbSelect = modelSelect(null, function (value) {
+      if (value && !fallbackEntry.includes(value)) {
+        fallbackEntry.push(value);
+        state.roles[role] = Object.assign({}, entry, { fallback: fallbackEntry });
+        markDirty();
+        renderRoles();
+      }
+    });
+    fbSelect.querySelector("select").size = 15;
+    fbContainer.append(fbSelect);
+    var fbAddBtn = el("button", {
+      className: "toggle",
+      type: "button",
+      textContent: "+",
+      style: { fontSize: "12px", padding: "2px 6px" },
+      onclick: function () {
+        var val = fbSelect.querySelector("select").value;
+        if (val && !fallbackEntry.includes(val)) {
+          fallbackEntry.push(val);
+          state.roles[role] = Object.assign({}, entry, { fallback: fallbackEntry });
+          markDirty();
+          renderRoles();
+        }
+      }
+    });
+    fbContainer.append(fbAddBtn);
+    fbRow.append(fbLabel, fbContainer);
+    host.append(fbRow);
+
+    // Remove buttons for each fallback
+    fallbackEntry.forEach(function (fbModel, idx) {
+      var removeRow = el("div", { className: "meter", style: { gridTemplateColumns: "100px 1fr auto", marginTop: "1px" } });
+      var removeLabel = el("span", { className: "tiny muted", textContent: "  " });
+      var removeModel = el("span", { className: "tiny mono", textContent: fbModel });
+      var removeBtn = el("button", {
+        className: "toggle",
+        type: "button",
+        textContent: "✕",
+        style: { fontSize: "10px", padding: "2px 8px", opacity: ".6" },
+        onclick: function () {
+          fallbackEntry.splice(idx, 1);
+          state.roles[role] = Object.assign({}, entry, { fallback: fallbackEntry.length ? fallbackEntry : undefined });
+          if (!fallbackEntry.length) delete state.roles[role].fallback;
+          markDirty();
+          renderRoles();
+        }
+      });
+      removeRow.append(removeLabel, removeModel, removeBtn);
+      host.append(removeRow);
+    });
   });
 }
 
@@ -1351,7 +1424,66 @@ function renderSubagents() {
       })
     ]);
     host.append(row);
-  });
+
+      // Fallback chain row
+      var fallbackEntry = entry.fallback || [];
+      var fbRow = el("div", { className: "meter", style: { gridTemplateColumns: "150px 1fr auto", marginTop: "2px" } });
+      var fbLabel = el("span", { className: "tiny muted", textContent: "  └─ fallback" });
+      var fbContainer = el("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" } });
+      var fbSelect = modelSelect(null, function (value) {
+        if (value && !fallbackEntry.includes(value)) {
+          fallbackEntry.push(value);
+          agents[type] = Object.assign({}, entry, { fallback: fallbackEntry });
+          state.subagents.agents = agents;
+          markDirty();
+          renderSubagents();
+        }
+      });
+      fbSelect.querySelector("select").size = 15;
+      fbContainer.append(fbSelect);
+      var fbAddBtn = el("button", {
+        className: "toggle",
+        type: "button",
+        textContent: "+",
+        style: { fontSize: "12px", padding: "2px 6px" },
+        onclick: function () {
+          var val = fbSelect.querySelector("select").value;
+          if (val && !fallbackEntry.includes(val)) {
+            fallbackEntry.push(val);
+            agents[type] = Object.assign({}, entry, { fallback: fallbackEntry });
+            state.subagents.agents = agents;
+            markDirty();
+            renderSubagents();
+          }
+        }
+      });
+      fbContainer.append(fbAddBtn);
+      fbRow.append(fbLabel, fbContainer);
+      host.append(fbRow);
+
+      // Remove buttons for each fallback
+      fallbackEntry.forEach(function (fbModel, idx) {
+        var removeRow = el("div", { className: "meter", style: { gridTemplateColumns: "150px 1fr auto", marginTop: "1px" } });
+        var removeLabel = el("span", { className: "tiny muted", textContent: "  " });
+        var removeModel = el("span", { className: "tiny mono", textContent: fbModel });
+        var removeBtn = el("button", {
+          className: "toggle",
+          type: "button",
+          textContent: "✕",
+          style: { fontSize: "10px", padding: "2px 8px", opacity: ".6" },
+          onclick: function () {
+            fallbackEntry.splice(idx, 1);
+            agents[type] = Object.assign({}, entry, { fallback: fallbackEntry.length ? fallbackEntry : undefined });
+            if (!fallbackEntry.length) delete agents[type].fallback;
+            state.subagents.agents = agents;
+            markDirty();
+            renderSubagents();
+          }
+        });
+        removeRow.append(removeLabel, removeModel, removeBtn);
+        host.append(removeRow);
+      });
+    });
 
   host.append(el("div", { className: "meter", style: { gridTemplateColumns: "150px minmax(0, 2.2fr) 92px 118px" } }, [
     el("span", { className: "mono", textContent: "maxConcurrency" }),
@@ -1385,6 +1517,7 @@ function renderRoutingDefs() {
     ["Modelo", "Qué modelo atiende ese papel. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
     ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. " +
       effortLevels.join(" · ") + "."],
+    ["Fallback", "Lista de modelos secundarios. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden. Útil para tener un plan B sin perder control."],
     ["Exigencia (modelPolicy) — required", "El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium."],
     ["Exigencia (modelPolicy) — preferred", "El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla."],
     ["Exigencia (modelPolicy) — inherit", "Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción."],
@@ -1494,7 +1627,97 @@ function renderCatalogDiagnostics() {
   host.append(el("div", { className: "tablewrap" }, table));
 }
 
-function renderCatalogDefs() {
+  /**
+   * Renders a provider-label editor. The user types a provider ID and a display name,
+   * clicks "Add", then clicks "Guardar y aplicar" to persist the change.
+   */
+  function renderProviderLabelsEditor() {
+    var host = clear("providerLabelsEditor");
+    if (!host) return;
+
+    var existing = state.routing && state.routing.providerLabels ? state.routing.providerLabels : {};
+    var externalProviders = [];
+    catalog.forEach(function (group) {
+      if (group.id !== "copilot") {
+        externalProviders.push({ id: group.id, label: group.label });
+      }
+    });
+
+    // If no external providers from catalog, try to list known ones from routing
+    if (!externalProviders.length) {
+      Object.keys(existing).forEach(function (pid) {
+        if (pid !== "copilot") {
+          externalProviders.push({ id: pid, label: existing[pid] });
+        }
+      });
+    }
+
+    // Input row
+    var inputRow = el("div", { className: "filters-row", style: { marginBottom: "10px" } });
+    var idInput = el("input", {
+      type: "text",
+      placeholder: "ID del proveedor (ej. c086cdfb-... o el hostname)",
+      style: { flex: "1 1 280px", fontSize: "12px", padding: "4px 8px", border: "1px solid var(--border-color-default, #d1d9e0)", borderRadius: "6px" }
+    });
+    var labelInput = el("input", {
+      type: "text",
+      placeholder: "Nombre legible (ej. Mi proveedor externo)",
+      style: { flex: "1 1 200px", fontSize: "12px", padding: "4px 8px", border: "1px solid var(--border-color-default, #d1d9e0)", borderRadius: "6px" }
+    });
+    var addBtn = el("button", {
+      className: "toggle",
+      type: "button",
+      textContent: "Agregar",
+      style: { fontSize: "11px", padding: "3px 12px" },
+      onclick: function () {
+        var pid = idInput.value.trim();
+        var plabel = labelInput.value.trim();
+        if (!pid || !plabel) return;
+        existing[pid] = plabel;
+        renderProviderLabelsEditor();
+      }
+    });
+    inputRow.append(idInput, labelInput, addBtn);
+    host.append(inputRow);
+
+    // List of existing labels
+    if (externalProviders.length || Object.keys(existing).length) {
+      var listDiv = el("div", { style: { marginTop: "8px" } });
+      var entries = externalProviders.length ? externalProviders : [];
+      Object.keys(existing).forEach(function (pid) {
+        if (!entries.find(function (e) { return e.id === pid; })) {
+          entries.push({ id: pid, label: existing[pid] });
+        }
+      });
+      entries.forEach(function (entry) {
+        var row = el("div", { className: "filters-row", style: { marginBottom: "4px", alignItems: "center" } });
+        var idSpan = el("span", {
+          className: "tiny mono",
+          textContent: entry.id,
+          style: { minWidth: "120px", color: "var(--text-color-muted, #59636e)" }
+        });
+        var labelSpan = el("span", {
+          textContent: entry.label,
+          style: { flex: "1 1 auto" }
+        });
+        var removeBtn = el("button", {
+          className: "toggle",
+          type: "button",
+          textContent: "✕",
+          style: { fontSize: "10px", padding: "2px 8px", opacity: ".6" },
+          onclick: function () {
+            delete existing[entry.id];
+            renderProviderLabelsEditor();
+          }
+        });
+        row.append(idSpan, labelSpan, removeBtn);
+        listDiv.append(row);
+      });
+      host.append(listDiv);
+    }
+  }
+
+  function renderCatalogDefs() {
   defs("catalogDefs", [
     ["Session runtime status", "Only an exact model ID present in a successful live session model list is marked as listed. This is not a credential, endpoint, or inference test."],
     ["Fallback catalog", "A display-only list used when the session model list is unavailable. It never confirms a configured workflow model is available."],
@@ -2585,6 +2808,7 @@ function renderAll() {
   renderRoutingDefs();
   renderCatalog();
   renderCatalogDefs();
+  renderProviderLabelsEditor();
   renderFilterBar();
   renderFilterBanner();
   renderRecommendations();
@@ -2605,6 +2829,7 @@ function activateTab(name) {
     panel.dataset.active = String(panel.dataset.panel === name);
   });
   if (name === "scene") ensureScene();
+  if (name === "catalog") renderProviderLabelsEditor();
 }
 
 document.getElementById("tabs").addEventListener("click", function (event) {

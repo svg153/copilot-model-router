@@ -426,7 +426,11 @@ function mergeAgentEntry(current, patch) {
     const merged = { ...current };
     for (const [field, value] of Object.entries(patch ?? {})) {
         if (value === null) delete merged[field];
-        else merged[field] = value;
+        else if (field === "fallback" && Array.isArray(value)) {
+            merged.fallback = value.filter(Boolean);
+        } else {
+            merged[field] = value;
+        }
     }
     return merged;
 }
@@ -454,8 +458,16 @@ function mergeRouting(base, patch, { replaceAgentEntries = false } = {}) {
         }
     }
     for (const role of WORKFLOW_ROLES) {
-        if (patch.roles?.[role]) out.roles[role] = { ...out.roles[role], ...patch.roles[role] };
-    }
+            if (patch.roles?.[role]) {
+                out.roles[role] = { ...out.roles[role], ...patch.roles[role] };
+                // Preserve fallback chain as an array of model IDs
+                if (Array.isArray(patch.roles[role].fallback)) {
+                    out.roles[role].fallback = patch.roles[role].fallback.filter(Boolean);
+                } else if (patch.roles[role].fallback === null) {
+                    delete out.roles[role].fallback;
+                }
+            }
+        }
     if (patch.subagents?.agents) {
         for (const [type, entry] of Object.entries(patch.subagents.agents)) {
             if (entry === null) {

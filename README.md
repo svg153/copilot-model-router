@@ -412,6 +412,30 @@ setx MODEL_ROUTER_PROVIDER_ID "<id-del-proveedor>"
 setx MODEL_ROUTER_PROVIDER_LABEL "Nombre visible"
 ```
 
+### Cadenas de fallback
+
+Cada rol y subagente puede tener una lista de modelos secundarios (`fallback`). Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden. Se configuran desde el panel en la pestaña **Routing** (sección "fallback" bajo cada modelo) o manualmente en `routing.json`:
+
+```json
+"roles": {
+  "orchestrate": {
+    "model": "deepseek-v4-flash",
+    "fallback": ["glm5.3-flash", "qwen3.8-flash"],
+    "effort": "high"
+  }
+},
+"subagents": {
+  "agents": {
+    "explore": {
+      "model": "qwen3.8-flash",
+      "fallback": ["deepseek-v4-flash"],
+      "effortLevel": "low",
+      "modelPolicy": "required"
+    }
+  }
+}
+```
+
 ## Notas
 
 - El catálogo es dinámico: si añades o quitas modelos en la app, el panel lo refleja
