@@ -58,8 +58,10 @@ if (Test-Path $target) {
 New-Item -ItemType Directory -Path $target -Force | Out-Null
 Copy-Item (Join-Path $source "*.mjs") $target
 
-# data/ y vendor/ son necesarios en runtime (benchmarks y pestaña 3D).
-foreach ($dir in @("data", "vendor", "test")) {
+# data/, vendor/ y renderer/ son necesarios en runtime (benchmarks, pestaña 3D
+# y el HTML que server.mjs importa desde ./renderer/index.mjs); test/ permite
+# ejecutar la suite sobre la instalación.
+foreach ($dir in @("data", "vendor", "test", "renderer")) {
     $srcDir = Join-Path $source $dir
     if (Test-Path $srcDir) {
         Copy-Item $srcDir $target -Recurse -Force
