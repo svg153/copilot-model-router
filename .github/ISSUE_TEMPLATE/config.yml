@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: README
+    url: https://github.com/svg153/copilot-model-router/blob/main/README.md
+    about: Documentación del router, endpoints locales y formato de routing.json
