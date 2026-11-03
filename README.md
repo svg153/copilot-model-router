@@ -179,6 +179,13 @@ El script que hace el cruce (`scripts/build-data.mjs`) deja constancia de las tr
 `meta.sources` de la instantánea, y la pestaña **Guía** del panel las muestra con enlace
 directo.
 
+Las dos fuentes de GitHub van **fijadas a un SHA de commit** en `SOURCE_URLS`, de modo que
+una reconstrucción descarga bytes idénticos y reproduce los hashes de `manifest.json`;
+`models.dev` es una API versionada y no admite fijación. Para actualizar una fijación:
+mirar el HEAD del repositorio fuente (`gh api repos/<owner>/<repo>/commits/main --jq .sha`),
+sustituir el SHA en `SOURCE_URLS`, regenerar (`node scripts/build-data.mjs`) y commitear la
+instantánea junto con la nueva fijación.
+
 #### Base legal de la reutilización
 
 Esta instantánea es una **recopilación derivada con estructura propia**, no una copia de

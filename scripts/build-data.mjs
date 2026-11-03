@@ -36,11 +36,19 @@ function manifestKey(filePath) {
     return rel.split("\\").join("/");
 }
 
-const JEINLEE_BASE = "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/main/";
+// Third-party raw sources are pinned to commit SHAs so a rebuild downloads
+// byte-identical payloads and reproduces the manifest hashes. models.dev stays
+// unpinned: it is a versioned API endpoint, not a raw file at a git ref.
+// To bump a pin: get the upstream HEAD sha (gh api repos/<owner>/<repo>/commits/main --jq .sha),
+// replace the SHA below, run `node scripts/build-data.mjs`, and commit the
+// regenerated snapshot together with the new pin.
+const JEINLEE_BASE =
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/";
 
 const SOURCE_URLS = {
     modelsDev: "https://models.dev/api.json",
-    showdown: "https://raw.githubusercontent.com/verseles/showdown/main/data/showdown.json",
+    showdown:
+        "https://raw.githubusercontent.com/verseles/showdown/ca4749c3d11b15757192af7d8b88b5f97650772d/data/showdown.json",
     jeinlee: JEINLEE_BASE,
 };
 
