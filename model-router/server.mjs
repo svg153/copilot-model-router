@@ -19,7 +19,7 @@ import {
     resetRouting,
     saveRouting,
 } from "./routing.mjs";
-import { renderHtml } from "./renderer.mjs";
+import { renderHtml } from "./renderer/index.mjs";
 
 const MAX_BODY_BYTES = 256 * 1024;
 

@@ -1,25 +1,10 @@
-/**
- * Canvas HTML for the model router.
- *
- * The page is a single document with five tabs. It never talks to the host:
- * everything is served by the loopback server in extension.mjs, which injects
- * the initial state through `BOOT` and exposes `/routing`, `/catalog`, `/data`
- * and `/events`.
- *
- * Benchmarks, vendors and prices come from the public snapshot described in
- * ../README.md. Nothing here is specific to a provider or an account.
- */
-
-/** Serialize a value for embedding inside an inline <script> block. */
-function escapeJsonForScript(value) {
-    return JSON.stringify(value ?? null)
-        .replace(/</g, "\\u003c")
-        .replace(/>/g, "\\u003e")
-        .replace(/\u2028/g, "\\u2028")
-        .replace(/\u2029/g, "\\u2029");
-}
-
-const STYLES = `
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Router</title>
+<style>
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 body {
@@ -351,9 +336,10 @@ h2::before {
 @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
 }
-`;
+</style>
+</head>
+<body>
 
-const BODY = `
 <header>
   <div class="head-row">
     <div class="logo" aria-hidden="true">
@@ -603,54 +589,10 @@ const BODY = `
     </p>
   </div>
 </section>
-`;
 
-/**
- * @param {object} options
- * @param {object} options.routing       persisted routing document
- * @param {Array}  options.catalog       normalized catalog groups
- * @param {object} options.benchmarks    { rows, meta, source, repoUrl, snapshotUrl }
- * @param {string[]} options.effortLevels
- * @param {string[]} options.subagentTypes
- * @param {string[]} options.modelPolicies
- */
-export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, effortLevels, subagentTypes, modelPolicies, routerToken }) {
-    const boot = {
-        routing,
-        catalog,
-        catalogDiagnostics,
-        benchmarks: benchmarks ?? { rows: [], meta: null, source: "none" },
-        effortLevels,
-        subagentTypes,
-        modelPolicies,
-        // Per-server secret; POSTs must echo it back (see server.mjs guard).
-        routerToken: routerToken ?? "",
-    };
-
-    return `<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Model Router</title>
-<style>${STYLES}</style>
-</head>
-<body>
-${BODY}
 <script>
-const BOOT = ${escapeJsonForScript(boot)};
-${CLIENT}
-</script>
-</body>
-</html>
-`;
-}
+const BOOT = {"routing":{"version":2,"roles":{"orchestrate":{"model":"auto","reasoningEffort":"high"},"plan":{"model":"custom/opus","reasoningEffort":"high"},"execute":{"model":"custom/sonnet","reasoningEffort":"medium"},"verify":{"model":"custom/haiku","reasoningEffort":"low"}},"subagents":{"explore":{"model":"custom/flash","reasoningEffort":"low","required":true}}},"catalog":{"custom provider":{"models":[{"id":"custom/flash","label":"Flash","vendor":"custom","tier":"cheap","context":128000,"cost":{"input":0.1,"output":0.4},"reasoning":true}]}},"catalogDiagnostics":{"live":["custom/flash"],"missing":[],"fallback":[]},"benchmarks":{"rows":[],"meta":null,"source":"none"},"effortLevels":["minimal","low","medium","high","xhigh","max"],"subagentTypes":["explore","task","code-review"],"modelPolicies":["required","preferred","inherit"],"routerToken":"golden-test-token"};
 
-// ---------------------------------------------------------------------------
-// Client
-// ---------------------------------------------------------------------------
-
-const CLIENT = String.raw`
 var state = JSON.parse(JSON.stringify(BOOT.routing));
 var ROUTER_TOKEN = BOOT.routerToken || "";
 var catalogSnapshot = BOOT.catalog || {};
@@ -2873,4 +2815,7 @@ try {
     } catch (error) { /* ignore malformed push */ }
   });
 } catch (error) { /* SSE unsupported: the page still works, just not live */ }
-`;
+
+</script>
+</body>
+</html>
