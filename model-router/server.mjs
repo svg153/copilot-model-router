@@ -1,0 +1,180 @@
+// Loopback HTTP server for the Model Router canvas.
+//
+// Split out of extension.mjs so the request handler can be exercised in tests
+// without the Copilot SDK runtime: everything that needs the live session
+// (catalog fetch, benchmark fetch, subagent settings push) is injected as an
+// already-bound dependency.
+
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+    EFFORT_LEVELS,
+    BUILTIN_SUBAGENT_TYPES,
+    MODEL_POLICIES,
+    catalogDiagnostics,
+    loadRouting,
+    resetRouting,
+    saveRouting,
+} from "./routing.mjs";
+import { renderHtml } from "./renderer.mjs";
+
+const MAX_BODY_BYTES = 256 * 1024;
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+/** Bundled third-party assets (three.js), served to the 3D tab. See vendor/README.md. */
+const VENDOR_DIR = join(HERE, "vendor");
+
+function sendJson(res, status, payload) {
+    const body = JSON.stringify(payload);
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(body);
+}
+
+function readBody(req) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        let size = 0;
+        req.on("data", (chunk) => {
+            size += chunk.length;
+            if (size > MAX_BODY_BYTES) {
+                reject(new Error("request body too large"));
+                req.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+        req.on("end", () => {
+            const raw = Buffer.concat(chunks).toString("utf8");
+            if (!raw) {
+                resolve({});
+                return;
+            }
+            try {
+                resolve(JSON.parse(raw));
+            } catch {
+                reject(new Error("request body is not valid JSON"));
+            }
+        });
+        req.on("error", reject);
+    });
+}
+
+function broadcastRouting(entry, routing) {
+    const payload = `event: routing\ndata: ${JSON.stringify(routing)}\n\n`;
+    for (const client of entry.clients) client.write(payload);
+}
+
+/**
+ * Boot a loopback server on an ephemeral port.
+ *
+ * deps: { fetchCatalog, fetchBenchmarks, applySubagentSettings } — each already
+ * bound to the live session by extension.mjs.
+ */
+export async function startServer(deps) {
+    const { fetchCatalog, fetchBenchmarks, applySubagentSettings } = deps;
+    const entry = { server: null, url: "", clients: new Set() };
+
+    const server = createServer(async (req, res) => {
+        const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+        if (req.method === "GET" && url.pathname === "/events") {
+            res.writeHead(200, {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                Connection: "keep-alive",
+            });
+            res.write(": connected\n\n");
+            entry.clients.add(res);
+            req.on("close", () => entry.clients.delete(res));
+            return;
+        }
+
+        if (req.method === "GET" && url.pathname === "/routing") {
+            sendJson(res, 200, { routing: await loadRouting() });
+            return;
+        }
+
+        if (req.method === "GET" && url.pathname === "/catalog") {
+            const routing = await loadRouting();
+            const catalog = await fetchCatalog({
+                refresh: url.searchParams.get("refresh") === "1",
+                providerLabels: routing.providerLabels,
+            });
+            sendJson(res, 200, { catalog, diagnostics: catalogDiagnostics(routing, catalog) });
+            return;
+        }
+
+        if (req.method === "GET" && url.pathname === "/data") {
+            sendJson(
+                res,
+                200,
+                await fetchBenchmarks({ refresh: url.searchParams.get("refresh") === "1" })
+            );
+            return;
+        }
+
+        if (req.method === "POST" && (url.pathname === "/routing" || url.pathname === "/reset")) {
+            try {
+                const isReset = url.pathname === "/reset";
+                const routing = isReset ? await resetRouting() : await saveRouting(await readBody(req));
+                broadcastRouting(entry, routing);
+                const applied = await applySubagentSettings(routing);
+                sendJson(res, 200, { routing, applied });
+            } catch (error) {
+                sendJson(res, 400, { error: String(error?.message ?? error) });
+            }
+            return;
+        }
+
+        if (req.method === "GET" && url.pathname.startsWith("/vendor/")) {
+            const name = url.pathname.slice("/vendor/".length);
+            // Basename only, .js only: never let a request walk out of vendor/.
+            if (!/^[A-Za-z0-9._-]+\.js$/.test(name) || name.includes("..")) {
+                sendJson(res, 404, { error: "not found" });
+                return;
+            }
+            try {
+                const source = await readFile(join(VENDOR_DIR, name));
+                res.writeHead(200, {
+                    "Content-Type": "text/javascript; charset=utf-8",
+                    "Cache-Control": "public, max-age=86400",
+                });
+                res.end(source);
+            } catch {
+                sendJson(res, 404, { error: `${name} is not bundled` });
+            }
+            return;
+        }
+
+        if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
+            const routing = await loadRouting();
+            const catalog = await fetchCatalog({ providerLabels: routing.providerLabels });
+            const benchmarks = await fetchBenchmarks();
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(
+                renderHtml({
+                    routing,
+                    catalog,
+                    catalogDiagnostics: catalogDiagnostics(routing, catalog),
+                    benchmarks,
+                    effortLevels: EFFORT_LEVELS,
+                    subagentTypes: BUILTIN_SUBAGENT_TYPES,
+                    modelPolicies: MODEL_POLICIES,
+                })
+            );
+            return;
+        }
+
+        sendJson(res, 404, { error: "not found" });
+    });
+
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    entry.server = server;
+    entry.url = `http://127.0.0.1:${port}/`;
+    return entry;
+}
