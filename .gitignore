@@ -6,3 +6,4 @@ Desktop.ini
 routing.json.tmp
 **/artifacts/routing.json
 **/artifacts/routing.json.bak
+.software-factory/
