@@ -6,7 +6,7 @@
 // already-bound dependency.
 
 import { createServer } from "node:http";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,17 @@ function sendJson(res, status, payload) {
     const body = JSON.stringify(payload);
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     res.end(body);
+}
+
+/**
+ * Constant-time token comparison. Hashing first fixes both lengths so
+ * timingSafeEqual never throws, and the compare leaks nothing about the
+ * secret regardless of how far the attacker's guess gets.
+ */
+function tokenMatches(candidate, expected) {
+    const hash = (value) =>
+        createHash("sha256").update(typeof value === "string" ? value : String(value ?? "")).digest();
+    return timingSafeEqual(hash(candidate), hash(expected));
 }
 
 function readBody(req) {
@@ -95,7 +106,7 @@ export async function startServer(deps) {
             return;
         }
 
-        if (req.method === "POST" && req.headers["x-router-token"] !== token) {
+        if (req.method === "POST" && !tokenMatches(req.headers["x-router-token"], token)) {
             sendJson(res, 403, { error: "missing or invalid X-Router-Token" });
             return;
         }
