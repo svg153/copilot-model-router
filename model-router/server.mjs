@@ -6,6 +6,7 @@
 // already-bound dependency.
 
 import { createServer } from "node:http";
+import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,10 +76,29 @@ function broadcastRouting(entry, routing) {
  */
 export async function startServer(deps) {
     const { fetchCatalog, fetchBenchmarks, applySubagentSettings } = deps;
-    const entry = { server: null, url: "", clients: new Set() };
+    const entry = { server: null, url: "", clients: new Set(), token: "" };
+    // Per-instance secret handed to the canvas only through the rendered HTML.
+    // Mutations must echo it back, so other local processes or rebound DNS
+    // names cannot rewrite the routing policy. No Access-Control-Allow-Origin
+    // header is ever sent: cross-origin pages cannot read or touch this server.
+    const token = randomBytes(16).toString("hex");
+    entry.token = token;
+    let boundPort = 0;
 
     const server = createServer(async (req, res) => {
         const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+        // DNS-rebinding guard: only answer for the loopback host we bound to.
+        const host = req.headers.host ?? "";
+        if (boundPort && host !== `127.0.0.1:${boundPort}`) {
+            sendJson(res, 403, { error: "unexpected Host" });
+            return;
+        }
+
+        if (req.method === "POST" && req.headers["x-router-token"] !== token) {
+            sendJson(res, 403, { error: "missing or invalid X-Router-Token" });
+            return;
+        }
 
         if (req.method === "GET" && url.pathname === "/events") {
             res.writeHead(200, {
@@ -163,6 +183,7 @@ export async function startServer(deps) {
                     effortLevels: EFFORT_LEVELS,
                     subagentTypes: BUILTIN_SUBAGENT_TYPES,
                     modelPolicies: MODEL_POLICIES,
+                    routerToken: token,
                 })
             );
             return;
@@ -174,6 +195,7 @@ export async function startServer(deps) {
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;
+    boundPort = port;
     entry.server = server;
     entry.url = `http://127.0.0.1:${port}/`;
     return entry;

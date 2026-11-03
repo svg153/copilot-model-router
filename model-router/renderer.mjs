@@ -614,7 +614,7 @@ const BODY = `
  * @param {string[]} options.subagentTypes
  * @param {string[]} options.modelPolicies
  */
-export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, effortLevels, subagentTypes, modelPolicies }) {
+export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, effortLevels, subagentTypes, modelPolicies, routerToken }) {
     const boot = {
         routing,
         catalog,
@@ -623,6 +623,8 @@ export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, e
         effortLevels,
         subagentTypes,
         modelPolicies,
+        // Per-server secret; POSTs must echo it back (see server.mjs guard).
+        routerToken: routerToken ?? "",
     };
 
     return `<!doctype html>
@@ -650,6 +652,7 @@ ${CLIENT}
 
 const CLIENT = String.raw`
 var state = JSON.parse(JSON.stringify(BOOT.routing));
+var ROUTER_TOKEN = BOOT.routerToken || "";
 var catalogSnapshot = BOOT.catalog || {};
 var catalogDiagnostics = BOOT.catalogDiagnostics || {};
 var catalog = catalogGroups(catalogSnapshot);
@@ -2734,7 +2737,7 @@ function renderSources() {
 async function post(path, body) {
   var response = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Router-Token": ROUTER_TOKEN },
     body: JSON.stringify(body || {})
   });
   if (!response.ok) throw new Error("HTTP " + response.status);
