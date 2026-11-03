@@ -1,0 +1,89 @@
+# Publishes a tagged GitHub release of the model-router extension whenever
+# extension code lands on main (issue #36), so the locally installed copy never
+# goes stale without a downloadable artifact.
+#
+# Recursion guard: this workflow only fires for paths under model-router/**,
+# while the version-bump commit below touches only package.json at the repo
+# root — so the bump push cannot retrigger a release. The [skip ci] marker in
+# the bump message is belt and braces for pathless workflows (test.yml).
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "model-router/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Gate on artifact manifest and test suite
+        # Same commands as test.yml — never tag a state CI would reject.
+        run: |
+          node scripts/build-data.mjs --verify
+          node --test model-router/test/*.test.mjs
+
+      - name: Compute next version
+        id: ver
+        run: |
+          NEXT=$(node scripts/release-version.mjs "$(node -p "require('./package.json').version")")
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Next release: v$NEXT"
+
+      - name: Commit version bump
+        env:
+          NEXT: ${{ steps.ver.outputs.version }}
+        run: |
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.NEXT;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore(release): v${NEXT} [skip ci]"
+          git push origin HEAD:main
+
+      - name: Tag the bump commit
+        env:
+          NEXT: ${{ steps.ver.outputs.version }}
+        run: |
+          git tag -a "v${NEXT}" -m "model-router v${NEXT}"
+          git push origin "v${NEXT}"
+
+      - name: Package the extension zip
+        # Layout matches what a released install needs: extract anywhere and
+        # run ./install.ps1 (it installs ./model-router and reports the version
+        # from ./package.json).
+        env:
+          NEXT: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir dist
+          cp -r model-router dist/model-router
+          cp install.ps1 package.json dist/
+          cd dist
+          zip -qr "../model-router-v${NEXT}.zip" model-router install.ps1 package.json
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT: ${{ steps.ver.outputs.version }}
+        run: |
+          gh release create "v${NEXT}" "model-router-v${NEXT}.zip" \
+            --title "model-router v${NEXT}" \
+            --generate-notes

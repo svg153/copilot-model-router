@@ -350,6 +350,20 @@ cd copilot-model-router
 Copia la carpeta `model-router/` dentro de `%USERPROFILE%\.copilot\extensions\`
 (o `$COPILOT_HOME\extensions\` si defines esa variable) y recarga las extensiones.
 
+### Releases
+
+Cada merge a `main` que modifica `model-router/` publica automáticamente una release
+`vX.Y.Z` (workflow `release.yml`): sube la versión de `package.json`, etiqueta el commit
+y adjunta un zip con `model-router/`, `install.ps1` y `package.json`. Para instalar esa
+versión exacta:
+
+```powershell
+gh release download <vX.Y.Z> --pattern "*.zip"
+Expand-Archive model-router-<vX.Y.Z>.zip -DestinationPath release
+cd release
+./install.ps1
+```
+
 ## Uso
 
 Abre el panel **Model Router** desde el canvas, cambia lo que quieras y pulsa
