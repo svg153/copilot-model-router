@@ -31,4 +31,7 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - name: Run test suite
-        run: node --test model-router/test/
+        # Bash expands the glob, so this works identically on Node 20 (no glob
+        # support in --test args) and Node 22 (positional dir args are not
+        # expanded since v21). Matches the command documented in README.md.
+        run: node --test model-router/test/*.test.mjs
