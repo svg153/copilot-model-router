@@ -172,3 +172,13 @@ test("no Access-Control-Allow-Origin header is ever sent", async () => {
         assert.equal(res.headers.get("access-control-allow-origin"), null, path);
     }
 });
+
+test("canvas HTML carries Content-Security-Policy with frame-ancestors 'none'", async () => {
+    const res = await fetch(`${base()}`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+    const csp = res.headers.get("content-security-policy");
+    assert.ok(csp, "CSP header missing on GET /");
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /default-src 'self'/);
+});
