@@ -1,25 +1,23 @@
 import assert from "node:assert/strict";
-import { registerHooks } from "node:module";
+import * as module from "node:module";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
+import { resolve as stubExtensionSdk } from "./workflow-hooks.mjs";
 
 const home = await mkdtemp(join(tmpdir(), "model-router-workflow-"));
 process.env.COPILOT_HOME = home;
 await mkdir(join(home, "extensions", "model-router", "artifacts"), { recursive: true });
 
-registerHooks({
-    resolve(specifier, context, nextResolve) {
-        if (specifier === "@github/copilot-sdk/extension") {
-            return {
-                url: "data:text/javascript,export%20const%20defineWorkflow%20%3D%20(definition)%20%3D%3E%20definition%3B",
-                shortCircuit: true,
-            };
-        }
-        return nextResolve(specifier, context);
-    },
-});
+// module.registerHooks (in-thread) exists only on Node >=22.15; module.register
+// (Node >=20.6, deprecated on newer runtimes) is the fallback so the suite also
+// runs on the Node 20 CI leg.
+if (typeof module.registerHooks === "function") {
+    module.registerHooks({ resolve: stubExtensionSdk });
+} else {
+    module.register(new URL("./workflow-hooks.mjs", import.meta.url));
+}
 
 const { planThenExecute } = await import("../workflow.mjs");
 
