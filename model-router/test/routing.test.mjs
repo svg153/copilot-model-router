@@ -10,7 +10,7 @@ process.env.COPILOT_HOME = home;
 const artifacts = join(home, "extensions", "model-router", "artifacts");
 await mkdir(artifacts, { recursive: true });
 
-const { DEFAULT_ROUTING, catalogDiagnostics, defaultRoutingFor, loadRouting, policyProse, saveRouting } =
+const { DEFAULT_ROUTING, catalogDiagnostics, defaultRoutingFor, loadRouting, policyProse, saveRouting, toSubagentSettings } =
     await import("../routing.mjs");
 const { renderHtml } = await import("../renderer.mjs");
 
@@ -155,4 +155,31 @@ test("policy and canvas surface all four workflow stages", async () => {
     const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     assert.ok(script, "rendered page should include its client script");
     assert.doesNotThrow(() => new Script(script), "rendered client script should parse");
+});
+
+test("policy prose renders fallback chains as permission and subagent settings drop them", () => {
+    const routing = {
+        version: 1,
+        roles: {
+            orchestrate: { model: "prov/a", effort: "high", fallback: ["prov/b", "prov/c"] },
+            plan: { model: "prov/b", effort: "medium" },
+            execute: { model: "prov/c", effort: "low", fallback: [] },
+            verify: { model: "prov/d", effort: "medium" },
+        },
+        subagents: {
+            agents: {
+                task: { model: "prov/t", modelPolicy: "required", fallback: ["prov/t2"] },
+            },
+        },
+    };
+    const policy = policyProse(routing);
+    assert.match(policy, /prov\/a \(reasoning effort: high\) \(if it does not respond, you may also use: prov\/b, prov\/c\)/);
+    assert.match(policy, /task -> prov\/t \(enforced\) \(if it does not respond, you may also use: prov\/t2\)/);
+    // Empty fallback and absent fallback render no suffix.
+    assert.ok(!policy.includes("prov/c (if"));
+    assert.ok(!policy.includes("prov/b (reasoning effort: medium) (if"));
+
+    // Wire shape must not gain unsupported fallback fields.
+    const wire = toSubagentSettings(routing);
+    assert.deepEqual(wire.agents.task, { model: "prov/t", modelPolicy: "required" });
 });
