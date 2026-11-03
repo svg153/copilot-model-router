@@ -12,7 +12,7 @@ await mkdir(artifacts, { recursive: true });
 
 const { DEFAULT_ROUTING, catalogDiagnostics, defaultRoutingFor, loadRouting, policyProse, saveRouting, toSubagentSettings } =
     await import("../routing.mjs");
-const { renderHtml } = await import("../renderer.mjs");
+const { renderHtml } = await import("../renderer/index.mjs");
 
 before(async () => {
     await writeFile(join(artifacts, "routing.json"), JSON.stringify({

@@ -4,3 +4,6 @@ model-router/data/*.json text eol=lf
 model-router/vendor/*.js text eol=lf
 model-router/test/*.mjs text eol=lf
 scripts/*.mjs text eol=lf
+model-router/renderer/*.mjs eol=lf
+model-router/test/__golden__/*.html eol=lf
+model-router/test/fixtures/*.mjs eol=lf
