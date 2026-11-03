@@ -30,6 +30,11 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - name: Verify artifact manifest (SHA-256)
+        # Fails fast on byte drift in data/ or vendor/ against manifest.json
+        # (#22), before any test can mask a supply-chain change as a test bug.
+        run: node scripts/build-data.mjs --verify
+
       - name: Run test suite
         # Bash expands the glob, so this works identically on Node 20 (no glob
         # support in --test args) and Node 22 (positional dir args are not
