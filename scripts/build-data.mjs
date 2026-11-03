@@ -19,6 +19,7 @@ import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { preservePreviousTimestamp } from "./timestamps.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");
@@ -627,9 +628,7 @@ async function main() {
     // scheduled workflow does not commit an empty refresh every week.
     try {
         const previous = JSON.parse(await readFile(OUT_FILE, "utf8"));
-        const withoutTimestamp = (value) => JSON.stringify({ ...value, meta: { ...value.meta, generatedAt: null } });
-        if (previous?.meta?.generatedAt && withoutTimestamp(previous) === withoutTimestamp(payload)) {
-            payload.meta.generatedAt = previous.meta.generatedAt;
+        if (preservePreviousTimestamp(payload, previous, ["meta", "generatedAt"])) {
             log("  no upstream change; keeping the previous timestamp");
         }
     } catch {
@@ -659,6 +658,17 @@ async function main() {
         sources: Object.fromEntries([...DOWNLOADS].map(([url, digest]) => [url, { sha256: digest }])),
     };
     const manifestFile = join(dirname(OUT_FILE), "manifest.json");
+    // Same rule as the snapshot: when nothing substantive changed, keep the
+    // previous manifest timestamp so an unchanged build writes zero bytes of
+    // diff and the refresh workflow has nothing to open a PR for.
+    try {
+        const previousManifest = JSON.parse(await readFile(manifestFile, "utf8"));
+        if (preservePreviousTimestamp(manifest, previousManifest, ["generatedAt"])) {
+            log("  no upstream change; keeping the previous manifest timestamp");
+        }
+    } catch {
+        // No previous manifest, or it is unreadable: write a fresh one.
+    }
     await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
     log("");

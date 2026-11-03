@@ -4,8 +4,17 @@ name: Refresh model data
 # so refreshing it here is what keeps an installed extension's vendor, price and
 # benchmark columns up to date without shipping a new extension version.
 #
-# The script keeps the previous `generatedAt` when nothing else changed, so a
-# week with no upstream movement produces no diff and no commit.
+# The script keeps the previous `generatedAt` on both the snapshot and the
+# manifest when nothing else changed, so a week with no upstream movement
+# produces no diff and no PR.
+#
+# Refreshed artifacts never land on main directly: a diff opens a pull request
+# that still needs review (#30), so a compromised upstream cannot land content
+# unreviewed. Checkout and PR base are pinned to `main` so manual runs of any
+# ref build the production snapshot and propose it against `main`. The snapshot is verified against the manifest before that PR
+# opens — a PR created with the default GITHUB_TOKEN does not trigger other
+# workflow runs, so the `--verify` gate has to run here rather than in CI on
+# the bot-authored PR.
 
 on:
   schedule:
@@ -19,6 +28,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: refresh-model-data
@@ -29,6 +39,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Always build the production snapshot: manual runs on any ref must
+          # not refresh against a feature branch.
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -37,14 +51,26 @@ jobs:
       - name: Build snapshot
         run: node scripts/build-data.mjs
 
-      - name: Commit when it changed
-        run: |
-          if git diff --quiet -- model-router/data/models-enriched.json; then
-            echo "Snapshot already current."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add model-router/data/models-enriched.json model-router/data/manifest.json
-          git commit -m "chore: refresh model data snapshot"
-          git push
+      - name: Verify snapshot against manifest
+        # The PR below carries exactly these bytes, so gate on them now: CI
+        # would not run on a PR authored with the default GITHUB_TOKEN.
+        run: node scripts/build-data.mjs --verify
+
+      - name: Open or update refresh PR
+        uses: peter-evans/create-pull-request@v8.1.1
+        with:
+          add-paths: |
+            model-router/data/models-enriched.json
+            model-router/data/manifest.json
+          base: main
+          branch: chore/refresh-model-data
+          delete-branch: true
+          commit-message: "chore: refresh model data snapshot"
+          title: "chore: refresh model data snapshot"
+          labels: infrastructure
+          body: |
+            Automated refresh of the model data snapshot (generated JSON + integrity manifest).
+
+            - Built by the `Refresh model data` workflow from the sources pinned in `scripts/build-data.mjs`.
+            - `node scripts/build-data.mjs --verify` passed in that same run before this PR opened; bot-authored PRs do not trigger the test workflow (GITHUB_TOKEN recursion guard), so the gate runs at build time.
+            - The workflow never pushes to `main` directly; review the snapshot diff before merging.
