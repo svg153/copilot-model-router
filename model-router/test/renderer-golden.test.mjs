@@ -1,7 +1,7 @@
 // Golden test: pins the exact HTML produced by the renderer so the module
 // split (issue #13) can be proven byte-identical. Regenerate the golden file
-// only together with an intentional, reviewed HTML change:
-//   node -e "import('./model-router/renderer/index.mjs').then(m => ...)"
+// only together with an intentional, reviewed HTML change, via:
+//   node scripts/regen-golden.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

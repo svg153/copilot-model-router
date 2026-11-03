@@ -370,6 +370,8 @@ args: {
 All model overrides are optional and default to the saved routing configuration.
 Without `targets`, Orchestrate's decomposition targets become the Execute units.
 The routing regression tests run with `node --test model-router/test/*.test.mjs`.
+After an intentional, reviewed renderer change, regenerate the pinned golden
+HTML with `node scripts/regen-golden.mjs`.
 
 ## Configuración
 
