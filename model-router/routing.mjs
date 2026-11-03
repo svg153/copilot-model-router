@@ -181,9 +181,73 @@ export function normalizeCatalog(modelList, providerLabels = DEFAULT_PROVIDER_LA
     return providers;
 }
 
+/** Flattens a catalog (the shape `normalizeCatalog` returns) into its model entries. */
+function modelsFromCatalog(catalog) {
+    return (Array.isArray(catalog) ? catalog : []).flatMap((group) => group?.models ?? []);
+}
+
+/**
+ * Resolves a persisted model id to the canonical id the catalog actually knows.
+ *
+ * A bare BYOK id (`qwen3.8-flash`) cannot be resolved by the runtime, which then
+ * silently routes to a different model even under `modelPolicy: "required"`, so
+ * ids are healed against the catalog wherever they are read or written.
+ *
+ * An exact hit wins; an id already carrying a provider prefix is returned
+ * untouched, because remapping it onto a same-named model of *another* provider
+ * would change who is billed; a bare id is resolved only when exactly one catalog
+ * model has it as its basename, since guessing is worse than leaving a visible
+ * misconfiguration.
+ */
+export function resolveModelId(id, models) {
+    if (typeof id !== "string" || !id) return id;
+    const list = Array.isArray(models) ? models : [];
+    if (!list.length) return id;
+    if (list.some((model) => model?.id === id)) return id;
+    if (id.includes("/")) return id;
+    const matches = list.filter((model) => typeof model?.id === "string" && model.id.endsWith(`/${id}`));
+    return matches.length === 1 ? matches[0].id : id;
+}
+
+/**
+ * Shallow copy of `routing` with every pinned model id — each role's and each
+ * subagent entry's `model` and every `fallback[]` id — resolved against `models`.
+ * An empty catalog makes this a strict no-op, so behavior without a live model
+ * list is unchanged. Fallback arrays keep their order and their duplicates.
+ */
+export function normalizeRoutingModels(routing, models) {
+    const list = Array.isArray(models) ? models : [];
+    if (!routing || typeof routing !== "object" || !list.length) return routing;
+
+    const normalizeEntry = (entry) => {
+        if (!entry || typeof entry !== "object") return entry;
+        const out = { ...entry };
+        if ("model" in out) out.model = resolveModelId(out.model, list);
+        if (Array.isArray(out.fallback)) out.fallback = out.fallback.map((id) => resolveModelId(id, list));
+        return out;
+    };
+
+    const next = { ...routing };
+    if (routing.roles && typeof routing.roles === "object") {
+        next.roles = Object.fromEntries(
+            Object.entries(routing.roles).map(([role, entry]) => [role, normalizeEntry(entry)])
+        );
+    }
+    if (routing.subagents && typeof routing.subagents === "object" &&
+        routing.subagents.agents && typeof routing.subagents.agents === "object") {
+        next.subagents = {
+            ...routing.subagents,
+            agents: Object.fromEntries(
+                Object.entries(routing.subagents.agents).map(([type, entry]) => [type, normalizeEntry(entry)])
+            ),
+        };
+    }
+    return next;
+}
+
 /** Compares saved workflow model IDs with the current session's live model list. */
 export function catalogDiagnostics(routing, catalog) {
-    const models = (catalog?.providers ?? []).flatMap((provider) => provider.models ?? []);
+    const models = modelsFromCatalog(catalog?.providers);
     const live = catalog?.source === "live";
     return {
         source: catalog?.source ?? "unknown",
@@ -205,6 +269,20 @@ export function catalogDiagnostics(routing, catalog) {
                     },
                 ];
             })
+        ),
+        // Subagent pins carry modelPolicy "required", so an id the runtime cannot
+        // resolve is a silently dead pin; they are checked like the roles are.
+        subagents: Object.fromEntries(
+            Object.entries(routing?.subagents?.agents ?? {})
+                .filter(([, entry]) => entry?.model)
+                .map(([type, entry]) => [
+                    type,
+                    {
+                        model: entry.model,
+                        modelPolicy: entry.modelPolicy ?? null,
+                        available: live ? models.some((item) => item.id === entry.model) : null,
+                    },
+                ])
         ),
     };
 }
@@ -313,17 +391,12 @@ async function detectedCatalog() {
  * Existing persisted roles are merged separately and are never replaced here.
  */
 export function defaultRoutingFor(catalog = []) {
-    const models = catalog.flatMap((group) => group.models ?? []);
+    const models = modelsFromCatalog(catalog);
     if (!models.length) return DEFAULT_ROUTING;
 
     const ranked = [...models].sort((a, b) => cheapness(a) - cheapness(b));
     const execute = ranked[0].id;
-    const stageModel = (role) => {
-        const preferred = DEFAULT_ROUTING.roles[role].model;
-        return models.find((model) => model.id === preferred)?.id ??
-            models.find((model) => model.id.endsWith(`/${preferred.split("/").pop()}`))?.id ??
-            preferred;
-    };
+    const stageModel = (role) => resolveModelId(DEFAULT_ROUTING.roles[role].model, models);
     const executeModel = stageModel("execute");
 
     return {
@@ -352,7 +425,15 @@ export function defaultRoutingFor(catalog = []) {
 }
 
 /** Human-readable policy injected into the session so the agent routes deliberately. */
-export function policyProse(routing, catalog = []) {    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
+export function policyProse(routing, catalog = []) {
+    // A non-empty fallback array is a permission to the agent, not an automatic
+    // retry the runtime performs; render it as such so prose and config agree.
+    const fallbackSuffix = (entry) =>
+        Array.isArray(entry?.fallback) && entry.fallback.length
+            ? ` (if it does not respond, you may also use: ${entry.fallback.join(", ")})`
+            : "";
+
+    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
         type,
         entry: routing.subagents?.agents?.[type],
     })).filter(({ entry }) => entry?.model);
@@ -361,8 +442,8 @@ export function policyProse(routing, catalog = []) {    const agents = BUILTIN_S
     const advisory = agents.filter(({ entry }) => entry.modelPolicy !== "required");
 
     const lines = [
-        ...enforced.map(({ type, entry }) => `- ${type} -> ${entry.model} (enforced)`),
-        ...advisory.map(({ type, entry }) => `- ${type} -> ${entry.model} (advisory)`),
+        ...enforced.map(({ type, entry }) => `- ${type} -> ${entry.model} (enforced)${fallbackSuffix(entry)}`),
+        ...advisory.map(({ type, entry }) => `- ${type} -> ${entry.model} (advisory)${fallbackSuffix(entry)}`),
     ];
 
     const enforcement = [];
@@ -401,11 +482,11 @@ export function policyProse(routing, catalog = []) {    const agents = BUILTIN_S
     return [
         "<model-routing-policy>",
         "Model routing is configured for this machine. Follow it instead of leaving model choice to Auto.",
-        `- Orchestration / task decomposition / planning targets -> ${routing.roles.orchestrate.model} (reasoning effort: ${routing.roles.orchestrate.effort})`,
+        `- Orchestration / task decomposition / planning targets -> ${routing.roles.orchestrate.model} (reasoning effort: ${routing.roles.orchestrate.effort})${fallbackSuffix(routing.roles.orchestrate)}`,
         "Orchestrate produces decomposition and targets for Plan; it must not implement changes.",
-        `- Detailed planning / architecture / hard reasoning -> ${routing.roles.plan.model} (reasoning effort: ${routing.roles.plan.effort})`,
-        `- Bulk execution, searching, summarizing, mechanical edits -> ${routing.roles.execute.model}`,
-        `- Verification and cross-checking -> ${routing.roles.verify.model}`,
+        `- Detailed planning / architecture / hard reasoning -> ${routing.roles.plan.model} (reasoning effort: ${routing.roles.plan.effort})${fallbackSuffix(routing.roles.plan)}`,
+        `- Bulk execution, searching, summarizing, mechanical edits -> ${routing.roles.execute.model}${fallbackSuffix(routing.roles.execute)}`,
+        `- Verification and cross-checking -> ${routing.roles.verify.model}${fallbackSuffix(routing.roles.verify)}`,
         "Pinned subagent types:",
         ...lines,
         ...enforcement,
@@ -525,6 +606,11 @@ async function loadBackupRouting() {
 }
 
 export async function loadRouting() {
+    // Healing happens in memory only: the read path never writes the file, so a
+    // pre-existing routing.json with bare ids works again without being touched.
+    const catalog = await detectedCatalog();
+    const models = modelsFromCatalog(catalog);
+    const heal = (routing) => normalizeRoutingModels(routing, models);
     let raw;
     try {
         raw = await readFile(ROUTING_FILE, "utf8");
@@ -533,22 +619,23 @@ export async function loadRouting() {
         // by a scanner, a permissions blip) must not silently become the new truth.
         if (error?.code !== "ENOENT") {
             const recovered = await loadBackupRouting();
-            if (recovered) return recovered;
+            if (recovered) return heal(recovered);
         }
-        return mergeRouting(defaultRoutingFor(await detectedCatalog()), null);
+        return heal(mergeRouting(defaultRoutingFor(catalog), null));
     }
     try {
-        return mergeRouting(DEFAULT_ROUTING, parseRouting(raw), { replaceAgentEntries: true });
+        return heal(mergeRouting(DEFAULT_ROUTING, parseRouting(raw), { replaceAgentEntries: true }));
     } catch {
         // Corrupt on disk: prefer the last known-good config over generated defaults.
         const recovered = await loadBackupRouting();
-        if (recovered) return recovered;
-        return mergeRouting(defaultRoutingFor(await detectedCatalog()), null);
+        if (recovered) return heal(recovered);
+        return heal(mergeRouting(defaultRoutingFor(catalog), null));
     }
 }
 
 export async function saveRouting(patch) {
-    const next = mergeRouting(await loadRouting(), patch);
+    const merged = mergeRouting(await loadRouting(), patch);
+    const next = normalizeRoutingModels(merged, modelsFromCatalog(await detectedCatalog()));
     const json = `${JSON.stringify(next, null, 2)}\n`;
     await backupRouting(json);
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
@@ -559,7 +646,8 @@ export async function saveRouting(patch) {
 }
 
 export async function resetRouting() {
-    const defaults = defaultRoutingFor(await detectedCatalog());
+    const catalog = await detectedCatalog();
+    const defaults = normalizeRoutingModels(defaultRoutingFor(catalog), modelsFromCatalog(catalog));
     const json = `${JSON.stringify(defaults, null, 2)}\n`;
     await backupRouting(json);
     await mkdir(dirname(ROUTING_FILE), { recursive: true });

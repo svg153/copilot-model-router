@@ -1591,13 +1591,23 @@ function renderCatalogDiagnostics() {
   var host = clear("catalogDiagnostics");
   var live = catalogSnapshot.source === "live";
   var knownIds = new Set(allModels().map(function (model) { return model.id; }));
-  var rows = [["Stage", "Configured model ID", "Session runtime status"]];
-  ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
-    var model = state.roles && state.roles[role] && state.roles[role].model || "";
-    var status = !live ? "Unknown — fallback catalog"
+  var rows = [["Stage / subagent", "Configured model ID", "Model policy", "Session runtime status"]];
+  var statusFor = function (model) {
+    return !live ? "Unknown — fallback catalog"
       : knownIds.has(model) ? "Listed by live runtime"
       : "Not exposed by this session";
-    rows.push([role, model || "(not configured)", status]);
+  };
+  ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
+    var model = state.roles && state.roles[role] && state.roles[role].model || "";
+    rows.push([role, model || "(not configured)", "—", statusFor(model)]);
+  });
+  // A subagent pin is the one enforced with modelPolicy=required, so an id the
+  // runtime cannot resolve silently routes elsewhere; the rows make that visible.
+  var pinnedAgents = (state.subagents && state.subagents.agents) || {};
+  Object.keys(pinnedAgents).forEach(function (type) {
+    var entry = pinnedAgents[type] || {};
+    if (!entry.model) return;
+    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || "(default)", statusFor(entry.model)]);
   });
   var sourceText = live
     ? "Source: session.rpc.model.list() — live session runtime"
@@ -1620,11 +1630,12 @@ function renderCatalogDiagnostics() {
   table.append(head);
   var body = el("tbody");
   rows.slice(1).forEach(function (row) {
-    body.append(el("tr", null, [
-      el("td", { className: "mono", textContent: row[0] }),
-      el("td", { className: "tiny mono", textContent: row[1] }),
-      el("td", { className: "small", textContent: row[2] })
-    ]));
+    body.append(el("tr", null, row.map(function (cell, index) {
+      return el("td", {
+        className: index === 1 ? "tiny mono" : index === 0 ? "mono" : "small",
+        textContent: cell
+      });
+    })));
   });
   table.append(body);
   host.append(el("div", { className: "tablewrap" }, table));
