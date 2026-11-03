@@ -251,9 +251,12 @@ recomendaciones por el simple hecho de no tener nada que lo penalizara.
 ### Actualización automática
 
 `.github/workflows/refresh-data.yml` regenera la instantánea los lunes a las 05:17 UTC,
-cuando cambia `scripts/build-data.mjs`, y a mano con *Run workflow*. Si el resultado es
-idéntico al anterior no hace commit. Como el script conserva el `generatedAt` cuando nada
-más cambia, dos ejecuciones seguidas producen un fichero byte a byte igual.
+cuando cambia `scripts/build-data.mjs`, y a mano con *Run workflow*. **Nunca hace push
+directo a `main`**: si el resultado difiere, la ejecución verifica la instantánea con
+`--verify` y abre (o actualiza) la PR `chore/refresh-model-data` con el JSON regenerado y
+su manifiesto, que se fusiona tras revisión. Si el resultado es idéntico no abre nada.
+Como el script conserva el `generatedAt` cuando nada más cambia, dos ejecuciones seguidas
+producen un fichero byte a byte igual.
 
 ```bash
 node scripts/build-data.mjs   # regenerar en local
