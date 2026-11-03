@@ -57,7 +57,21 @@ if (Test-Path $target) {
 
 New-Item -ItemType Directory -Path $target -Force | Out-Null
 Copy-Item (Join-Path $source "*.mjs") $target
-Copy-Item (Join-Path $source "artifacts") $target -Recurse
+
+# data/ y vendor/ son necesarios en runtime (benchmarks y pestaña 3D).
+foreach ($dir in @("data", "vendor", "test")) {
+    $srcDir = Join-Path $source $dir
+    if (Test-Path $srcDir) {
+        Copy-Item $srcDir $target -Recurse -Force
+    }
+    else {
+        Write-Warning "No existe $srcDir en el origen; se omite."
+    }
+}
+
+# artifacts/ contiene solo configuración del usuario (routing.json), no forma
+# parte del repo: se crea vacía y nunca se copia nada del origen.
+New-Item -ItemType Directory -Path (Join-Path $target "artifacts") -Force | Out-Null
 
 if ($savedRouting) {
     Set-Content -Path (Join-Path $target "artifacts\routing.json") -Value $savedRouting -NoNewline
