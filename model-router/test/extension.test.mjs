@@ -64,7 +64,7 @@ test("GET /routing returns the persisted routing config", async () => {
 test("POST /routing round-trips: save, read back, persist on disk, apply settings", async () => {
     const res = await fetch(`${base()}routing`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Router-Token": entry.token },
         body: JSON.stringify({ roles: { plan: { model: "custom/next" } } }),
     });
     assert.equal(res.status, 200);
@@ -87,7 +87,7 @@ test("POST /routing rejects invalid JSON with 400 and does not apply settings", 
     const before = appliedCalls;
     const res = await fetch(`${base()}routing`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Router-Token": entry.token },
         body: "{not-json",
     });
     assert.equal(res.status, 400);
@@ -121,4 +121,54 @@ test("GET / renders the canvas html; unknown paths 404", async () => {
 
     const nope = await fetch(`${base()}definitely-not-a-route`);
     assert.equal(nope.status, 404);
+});
+
+test("mutations require the per-server token; 403 without it", async () => {
+    const noToken = await fetch(`${base()}routing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles: { plan: { model: "evil/x" } } }),
+    });
+    assert.equal(noToken.status, 403);
+
+    const wrongToken = await fetch(`${base()}routing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Router-Token": "deadbeef" },
+        body: JSON.stringify({ roles: { plan: { model: "evil/x" } } }),
+    });
+    assert.equal(wrongToken.status, 403);
+
+    // The rejected writes must not have landed.
+    const routing = (await (await fetch(`${base()}routing`)).json()).routing;
+    assert.notEqual(routing.roles.plan.model, "evil/x");
+});
+
+test("served html embeds the token so the canvas can echo it back", async () => {
+    const text = await (await fetch(`${base()}index.html`)).text();
+    assert.ok(text.includes(entry.token), "BOOT should carry the per-server token");
+});
+
+test("spoofed Host header (DNS rebinding) is rejected", async () => {
+    const { request } = await import("node:http");
+    const { port } = new URL(entry.url);
+    const status = await new Promise((resolve, reject) => {
+        const req = request(
+            { host: "127.0.0.1", port, path: "/routing", headers: { Host: "evil.example" } },
+            (res) => {
+                res.resume();
+                resolve(res.statusCode);
+            }
+        );
+        req.on("error", reject);
+        req.end();
+    });
+    assert.equal(status, 403);
+});
+
+test("no Access-Control-Allow-Origin header is ever sent", async () => {
+    for (const path of ["routing", "index.html", "vendor/three.module.min.js"]) {
+        const res = await fetch(`${base()}${path}`);
+        await res.arrayBuffer();
+        assert.equal(res.headers.get("access-control-allow-origin"), null, path);
+    }
 });
