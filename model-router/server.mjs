@@ -184,7 +184,19 @@ export async function startServer(deps) {
             const routing = await loadRouting();
             const catalog = await fetchCatalog({ providerLabels: routing.providerLabels });
             const benchmarks = await fetchBenchmarks();
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.writeHead(200, {
+                "Content-Type": "text/html; charset=utf-8",
+                // frame-ancestors 'none': an external page that guesses the
+                // ephemeral loopback port must not iframe the canvas and drive
+                // it with the BOOT.routerToken it can read there. The inline
+                // allowances cover exactly what renderHtml emits (inline module
+                // scripts + <style>); everything else stays same-origin.
+                "Content-Security-Policy":
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+                    "font-src 'self' data:; connect-src 'self'; worker-src blob: 'self'; " +
+                    "object-src 'none'; frame-ancestors 'none'",
+            });
             res.end(
                 renderHtml({
                     routing,
