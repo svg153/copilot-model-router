@@ -1,0 +1,6 @@
+# Integrity manifest (scripts/build-data.mjs --verify) hashes exact bytes, so
+# the files it covers must check out identically on every platform.
+model-router/data/*.json text eol=lf
+model-router/vendor/*.js text eol=lf
+model-router/test/*.mjs text eol=lf
+scripts/*.mjs text eol=lf
