@@ -15,13 +15,26 @@
 // an installed extension can just download the snapshot instead of doing any of
 // this itself.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative } from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(HERE, "..");
 const OUT_FILE =
     process.env.MODEL_ROUTER_DATA_OUT || join(HERE, "..", "model-router", "data", "models-enriched.json");
+
+const sha256 = (data) => createHash("sha256").update(data).digest("hex");
+// sha256 of every third-party payload downloaded during this run, keyed by URL.
+const DOWNLOADS = new Map();
+
+/** Repo-root-relative posix path for manifest keys (absolute when outside). */
+function manifestKey(filePath) {
+    const rel = relative(REPO_ROOT, filePath);
+    if (rel.startsWith("..") || isAbsolute(rel)) return filePath;
+    return rel.split("\\").join("/");
+}
 
 const JEINLEE_BASE = "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/main/";
 
@@ -255,7 +268,9 @@ function parseScore(value) {
 async function fetchText(url) {
     const response = await fetch(url, { headers: { "user-agent": "copilot-model-router" } });
     if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${url}`);
-    return response.text();
+    const text = await response.text();
+    DOWNLOADS.set(url, sha256(text));
+    return text;
 }
 
 const fetchJson = async (url) => JSON.parse(await fetchText(url));
@@ -616,10 +631,63 @@ async function main() {
     const json = JSON.stringify(payload);
     await writeFile(OUT_FILE, json + "\n", "utf8");
 
+    // Integrity manifest: SHA-256 of the generated snapshot, of every vendored
+    // third-party file shipped in the repo, and of every payload downloaded
+    // from upstream this run. Verify later with: node scripts/build-data.mjs --verify
+    const artifacts = {
+        [manifestKey(OUT_FILE)]: { sha256: sha256(json + "\n"), bytes: Buffer.byteLength(json + "\n") },
+    };
+    const vendorDir = join(REPO_ROOT, "model-router", "vendor");
+    for (const name of (await readdir(vendorDir)).filter((n) => n.endsWith(".js")).sort()) {
+        const file = join(vendorDir, name);
+        const buf = await readFile(file);
+        artifacts[manifestKey(file)] = { sha256: sha256(buf), bytes: buf.length };
+    }
+    const manifest = {
+        schema: 1,
+        generatedAt: new Date().toISOString(),
+        algorithm: "sha256",
+        artifacts,
+        sources: Object.fromEntries([...DOWNLOADS].map(([url, digest]) => [url, { sha256: digest }])),
+    };
+    const manifestFile = join(dirname(OUT_FILE), "manifest.json");
+    await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
     log("");
     log(`Wrote ${OUT_FILE}`);
+    log(`  manifest: ${manifestFile} (${Object.keys(artifacts).length} artifacts, ${DOWNLOADS.size} downloads)`);
     log(`  ${counts.models} models · ${counts.withVendor} vendor · ${counts.withCost} cost · ${counts.withBenchmarks} benchmarks · ${counts.withSpeed} speed`);
     log(`  ${(json.length / 1024).toFixed(0)} KB`);
 }
 
-await main();
+async function verifyManifest() {
+    const manifestFile = join(dirname(OUT_FILE), "manifest.json");
+    let manifest;
+    try {
+        manifest = JSON.parse(await readFile(manifestFile, "utf8"));
+    } catch {
+        log(`FAIL cannot read manifest at ${manifestFile}`);
+        process.exit(2);
+    }
+    let bad = 0;
+    for (const [key, info] of Object.entries(manifest.artifacts)) {
+        const file = isAbsolute(key) ? key : join(REPO_ROOT, key);
+        let digest = null;
+        try {
+            digest = sha256(await readFile(file));
+        } catch {
+            // missing file counts as a failure below
+        }
+        const ok = digest === info.sha256;
+        if (!ok) bad++;
+        log(`  ${ok ? "OK  " : "FAIL"} ${key}`);
+    }
+    log(bad ? `${bad} artifact(s) do not match the manifest.` : `All ${Object.keys(manifest.artifacts).length} artifacts match.`);
+    process.exit(bad ? 1 : 0);
+}
+
+if (process.argv.includes("--verify")) {
+    await verifyManifest();
+} else {
+    await main();
+}

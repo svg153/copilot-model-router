@@ -243,6 +243,21 @@ más cambia, dos ejecuciones seguidas producen un fichero byte a byte igual.
 node scripts/build-data.mjs   # regenerar en local
 ```
 
+### Integridad de los datos de terceros
+
+Cada ejecución de `scripts/build-data.mjs` escribe `model-router/data/manifest.json` con
+el SHA-256 de la instantánea generada, de los ficheros `.js` vendorizados
+(`model-router/vendor/`) y de cada descarga de models.dev, showdown y jeinlee1991.
+Para comprobar localmente que lo commiteado coincide byte a byte con lo que se generó:
+
+```bash
+node scripts/build-data.mjs --verify   # 0 = todo OK, 1 = hay artefactos alterados, 2 = falta el manifiesto
+```
+
+La verificación automática dentro del loader se aplaza a propósito: la instantánea se
+regenera cada semana en CI, así que un hash en runtime solo avisaría de un fichero que
+iba a cambiar de todos modos. El manifiesto sirve para auditar el origen del contenido.
+
 ### Filtro por proveedor y selección de modelos
 
 La pestaña **Comparativa** tiene una barra de filtros que afecta a las seis tarjetas de
