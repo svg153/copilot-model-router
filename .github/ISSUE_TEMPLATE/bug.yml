@@ -1,0 +1,39 @@
+name: Bug report
+description: Reporta un comportamiento incorrecto con evidencia reproducible
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Qué falla, en una o dos frases, y dónde (archivo:módulo/ruta).
+      placeholder: routing persiste ids de modelo sin prefijo de proveedor y cae al default...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Pasos de reproducción, logs, salidas de `node --test`, o registros (session.usage_record, BOOT JSON, etc.).
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Criterios de aceptación medibles (lista de checks).
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: Archivos afectados o punto de partida probable.
+      placeholder: model-router/routing.mjs, model-router/extension.mjs
+    validations:
+      required: false

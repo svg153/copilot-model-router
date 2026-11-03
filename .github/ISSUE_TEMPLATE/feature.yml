@@ -1,0 +1,36 @@
+name: Feature request
+description: Propone una mejora o funcionalidad nueva
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Qué se quiere conseguir y por qué (problema que resuelve).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: "Enfoque propuesto: módulos afectados, formato de datos, UI del canvas, etc. Alternativas descartadas si las hay."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Criterios de aceptación medibles; la feature se considera hecha cuando...
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: Archivos previsiblemente afectados.
+    validations:
+      required: false
