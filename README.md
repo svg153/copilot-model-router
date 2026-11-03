@@ -414,7 +414,7 @@ setx MODEL_ROUTER_PROVIDER_LABEL "Nombre visible"
 
 ### Cadenas de fallback
 
-Cada rol y subagente puede tener una lista de modelos secundarios (`fallback`). Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden. Se configuran desde el panel en la pestaña **Routing** (sección "fallback" bajo cada modelo) o manualmente en `routing.json`:
+Cada rol y subagente puede tener una lista de modelos secundarios (`fallback`). **No existe reintento automático del runtime**: la cadena se proyecta como permiso dentro de la política que recibe la sesión (`policyProse`), que añade «si no responde, puedes usar: …» junto al modelo fijado. El agente decide usarla cuando el principal falla o no está disponible. Se configuran desde el panel en la pestaña **Routing** (sección "fallback" bajo cada modelo) o manualmente en `routing.json`:
 
 ```json
 "roles": {

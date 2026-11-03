@@ -352,7 +352,15 @@ export function defaultRoutingFor(catalog = []) {
 }
 
 /** Human-readable policy injected into the session so the agent routes deliberately. */
-export function policyProse(routing, catalog = []) {    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
+export function policyProse(routing, catalog = []) {
+    // A non-empty fallback array is a permission to the agent, not an automatic
+    // retry the runtime performs; render it as such so prose and config agree.
+    const fallbackSuffix = (entry) =>
+        Array.isArray(entry?.fallback) && entry.fallback.length
+            ? ` (if it does not respond, you may also use: ${entry.fallback.join(", ")})`
+            : "";
+
+    const agents = BUILTIN_SUBAGENT_TYPES.map((type) => ({
         type,
         entry: routing.subagents?.agents?.[type],
     })).filter(({ entry }) => entry?.model);
@@ -361,8 +369,8 @@ export function policyProse(routing, catalog = []) {    const agents = BUILTIN_S
     const advisory = agents.filter(({ entry }) => entry.modelPolicy !== "required");
 
     const lines = [
-        ...enforced.map(({ type, entry }) => `- ${type} -> ${entry.model} (enforced)`),
-        ...advisory.map(({ type, entry }) => `- ${type} -> ${entry.model} (advisory)`),
+        ...enforced.map(({ type, entry }) => `- ${type} -> ${entry.model} (enforced)${fallbackSuffix(entry)}`),
+        ...advisory.map(({ type, entry }) => `- ${type} -> ${entry.model} (advisory)${fallbackSuffix(entry)}`),
     ];
 
     const enforcement = [];
@@ -401,11 +409,11 @@ export function policyProse(routing, catalog = []) {    const agents = BUILTIN_S
     return [
         "<model-routing-policy>",
         "Model routing is configured for this machine. Follow it instead of leaving model choice to Auto.",
-        `- Orchestration / task decomposition / planning targets -> ${routing.roles.orchestrate.model} (reasoning effort: ${routing.roles.orchestrate.effort})`,
+        `- Orchestration / task decomposition / planning targets -> ${routing.roles.orchestrate.model} (reasoning effort: ${routing.roles.orchestrate.effort})${fallbackSuffix(routing.roles.orchestrate)}`,
         "Orchestrate produces decomposition and targets for Plan; it must not implement changes.",
-        `- Detailed planning / architecture / hard reasoning -> ${routing.roles.plan.model} (reasoning effort: ${routing.roles.plan.effort})`,
-        `- Bulk execution, searching, summarizing, mechanical edits -> ${routing.roles.execute.model}`,
-        `- Verification and cross-checking -> ${routing.roles.verify.model}`,
+        `- Detailed planning / architecture / hard reasoning -> ${routing.roles.plan.model} (reasoning effort: ${routing.roles.plan.effort})${fallbackSuffix(routing.roles.plan)}`,
+        `- Bulk execution, searching, summarizing, mechanical edits -> ${routing.roles.execute.model}${fallbackSuffix(routing.roles.execute)}`,
+        `- Verification and cross-checking -> ${routing.roles.verify.model}${fallbackSuffix(routing.roles.verify)}`,
         "Pinned subagent types:",
         ...lines,
         ...enforcement,
