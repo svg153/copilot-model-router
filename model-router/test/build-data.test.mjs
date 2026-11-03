@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,13 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..");
 const SCRIPT = join(REPO_ROOT, "scripts", "build-data.mjs");
+
+// install.ps1 copies model-router/ without scripts/, and every lookup below is
+// repo-root-relative: in an installed copy spawnSync would fail with ENOENT.
+// The SCRIPT path doubles as the repo-layout sentinel, so skip instead.
+const REPO_ONLY_SKIP = existsSync(SCRIPT)
+    ? false
+    : "installed copy: scripts/build-data.mjs is not present (repo-only test)";
 
 function run(args, env = {}) {
     return spawnSync(process.execPath, [SCRIPT, ...args], {
@@ -18,20 +25,20 @@ function run(args, env = {}) {
     });
 }
 
-test("--verify checks every committed artifact against data/manifest.json", () => {
+test("--verify checks every committed artifact against data/manifest.json", { skip: REPO_ONLY_SKIP }, () => {
     const res = run(["--verify"]);
     assert.equal(res.status, 0, res.stdout + res.stderr);
     assert.match(res.stdout, /All \d+ artifacts match/);
     assert.doesNotMatch(res.stdout, /FAIL/);
 });
 
-test("--verify exits 2 when the manifest is missing", () => {
+test("--verify exits 2 when the manifest is missing", { skip: REPO_ONLY_SKIP }, () => {
     const res = run(["--verify"], { MODEL_ROUTER_DATA_OUT: join(tmpdir(), "mr-no-such-dir", "models-enriched.json") });
     assert.equal(res.status, 2);
     assert.match(res.stdout + res.stderr, /cannot read manifest/i);
 });
 
-test("manifest.json records sha256 per artifact and per downloaded source", () => {
+test("manifest.json records sha256 per artifact and per downloaded source", { skip: REPO_ONLY_SKIP }, () => {
     const manifest = JSON.parse(readFileSync(join(REPO_ROOT, "model-router", "data", "manifest.json"), "utf8"));
     assert.equal(manifest.algorithm, "sha256");
     assert.ok(manifest.artifacts["model-router/data/models-enriched.json"]?.sha256.match(/^[0-9a-f]{64}$/));
