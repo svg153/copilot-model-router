@@ -78,8 +78,8 @@ Orden de resolución, de mayor a menor prioridad:
 
 The **Catalog** canvas tab shows the exact model IDs and provider labels returned by
 the current session's `session.rpc.model.list()`, the catalog source, and its last
-refresh timestamp. A diagnostics table compares each configured workflow role against
-that list. **Listed by live runtime** means the exact ID was returned by the session;
+refresh timestamp. A diagnostics table compares each configured workflow role *and* each
+pinned subagent (with its `modelPolicy`) against that list. **Listed by live runtime** means the exact ID was returned by the session;
 it does not test credentials, endpoint connectivity, or inference. **Not exposed by this
 session** means only that this session's list omitted it; it does not prove that the
 provider or model is absent from the desktop app's settings.
@@ -97,6 +97,15 @@ that this session can invoke a model.
 
 The policy injected into the session uses the saved model IDs and settings; the live
 catalog is diagnostic only and never silently substitutes a different model.
+
+Model IDs are normalized against the catalog whenever routing is saved, loaded, or
+reset: a bare ID that exactly one catalog model carries (for example `qwen3.8-flash`)
+is persisted as that model's canonical provider-qualified ID, because the runtime cannot
+resolve a bare BYOK ID and silently routes the call somewhere else even under
+`modelPolicy: "required"`. An ID that already carries a provider prefix is never
+remapped onto another provider, and an ambiguous or unknown ID is left verbatim rather
+than guessed. Loading heals in memory only, so a previously saved file is not rewritten
+until the next save; with no catalog available, nothing changes.
 
 To add providers, open **Settings → Model providers → Add provider** in the GitHub
 Copilot desktop app, save its endpoint and model, then select that model in the app's
@@ -365,6 +374,14 @@ El parser tolera un BOM UTF-8 inicial (`\uFEFF`). No es un detalle menor: `JSON.
 lo rechaza, y hay editores y herramientas de Windows que lo añaden sin avisar. Sin esa
 tolerancia, un archivo perfectamente válido se interpretaba como corrupto y el panel
 lo sustituía por los valores por defecto en la siguiente escritura.
+
+Al guardar, cargar o restaurar, cada ID de modelo se normaliza contra el catálogo: un
+ID sin prefijo de proveedor (`qwen3.8-flash`) se persiste como su ID canónico
+`<proveedor>/qwen3.8-flash` cuando **exactamente un** modelo del catálogo lo tiene. Un
+ID ya prefijado nunca se remapea a otro proveedor (cambiaría quién factura), y un ID
+ambiguo o desconocido se deja tal cual. La carga corrige solo en memoria: el archivo
+en disco no se reescribe hasta el siguiente guardado. Sin catálogo disponible, nada
+cambia.
 
 ### Fijación permanente sin la extensión
 
