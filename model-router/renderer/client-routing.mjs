@@ -63,7 +63,7 @@ function renderRoles() {
         renderRoles();
       }
     });
-    fbSelect.querySelector("select").size = 15;
+    fbSelect.size = 15;
     fbContainer.append(fbSelect);
     var fbAddBtn = el("button", {
       className: "toggle",
@@ -71,7 +71,7 @@ function renderRoles() {
       textContent: "+",
       style: { fontSize: "12px", padding: "2px 6px" },
       onclick: function () {
-        var val = fbSelect.querySelector("select").value;
+        var val = fbSelect.value;
         if (val && !fallbackEntry.includes(val)) {
           fallbackEntry.push(val);
           state.roles[role] = Object.assign({}, entry, { fallback: fallbackEntry });
@@ -159,7 +159,7 @@ function renderSubagents() {
           renderSubagents();
         }
       });
-      fbSelect.querySelector("select").size = 15;
+      fbSelect.size = 15;
       fbContainer.append(fbSelect);
       var fbAddBtn = el("button", {
         className: "toggle",
@@ -167,7 +167,7 @@ function renderSubagents() {
         textContent: "+",
         style: { fontSize: "12px", padding: "2px 6px" },
         onclick: function () {
-          var val = fbSelect.querySelector("select").value;
+          var val = fbSelect.value;
           if (val && !fallbackEntry.includes(val)) {
             fallbackEntry.push(val);
             agents[type] = Object.assign({}, entry, { fallback: fallbackEntry });
