@@ -358,11 +358,15 @@ y adjunta un zip con `model-router/`, `install.ps1` y `package.json`. Para insta
 versión exacta:
 
 ```powershell
-gh release download <vX.Y.Z> --pattern "*.zip"
-Expand-Archive model-router-<vX.Y.Z>.zip -DestinationPath release
+$tag = "v1.0.1"  # sustitúyelo por la versión que quieras instalar
+gh release download $tag --repo svg153/copilot-model-router --pattern "*.zip"
+Expand-Archive "model-router-$tag.zip" -DestinationPath release
 cd release
 ./install.ps1
 ```
+
+`--repo` hace la descarga independiente del directorio de trabajo: funciona
+fuera de un clone y nunca resuelve el repo equivocado.
 
 ## Uso
 
