@@ -16,6 +16,23 @@ body {
 }
 header { padding: 22px 0 14px; }
 .head-row { display: flex; align-items: flex-start; gap: 14px; }
+/* ── Bilingüe ES/EN ───────────────────────────────────────────────────────
+   Cada cadena estática vive duplicada en dos spans (.ie español, .ien
+   inglés); sólo uno se muestra según html[data-lang], que fija el script
+   del head al cargar y el botón ES|EN al alternar. */
+html[data-lang="en"] .ie { display: none; }
+html:not([data-lang="en"]) .ien { display: none; }
+.lang-toggle {
+    margin-left: auto; flex: none;
+    display: inline-flex; align-items: center; gap: 0;
+    padding: 4px 2px; background: none; border: none; cursor: pointer;
+    font: inherit; font-size: 12px; letter-spacing: 0.04em; color: var(--text-color-muted, #59636e);
+}
+.lang-toggle:hover { color: var(--text-color-default, #1f2328); }
+.lang-toggle .lt-sep { padding: 0 5px; opacity: 0.55; }
+.lang-toggle .lt-opt { font-weight: 600; opacity: 0.45; }
+html:not([data-lang="en"]) .lang-toggle .lt-es,
+html[data-lang="en"] .lang-toggle .lt-en { opacity: 1; }
 .logo {
     flex: none; width: 44px; height: 44px; border-radius: 12px;
     display: grid; place-items: center; color: #ffffff;

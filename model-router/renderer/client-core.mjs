@@ -121,7 +121,35 @@ var CAPABILITIES = {
   language: "Idioma"
 };
 
-var VENDOR_FALLBACK = "Sin identificar";
+// ── Idioma de la interfaz (bilingüe ES/EN) ───────────────────────────────
+// UI_LANG lo fija el script del <head> (localStorage "mr-lang" o idioma del
+// navegador) y se lee aquí al arrancar el cliente. L(es, en) se evalúa en
+// tiempo de render: los textos dinámicos se cambian con volver a llamar a
+// renderAll(); los estáticos del body viven duplicados en spans .ie/.ien.
+var langRefreshers = [];
+function L(es, en) { return UI_LANG === "en" ? en : es; }
+function setLang(next) {
+    UI_LANG = next;
+    var root = document.documentElement;
+    root.setAttribute("data-lang", next);
+    root.setAttribute("lang", next);
+    try { localStorage.setItem("mr-lang", next); } catch (e) {}
+    VENDOR_FALLBACK = L("Sin identificar", "Unidentified");
+    langRefreshers.forEach(function (fn) { fn(); });
+}
+(function wireLangToggle() {
+    var btn = document.getElementById("langToggle");
+    if (!btn) return;
+    btn.onclick = function () {
+        setLang(UI_LANG === "es" ? "en" : "es");
+        if (typeof renderAll === "function") renderAll();
+    };
+})();
+// Las cadenas que viven en constantes de módulo (etiquetas de categoría,
+// textos de política...) se recomponen en sus propios ficheros registrándose
+// aquí con langRefreshers.push(...).
+
+var VENDOR_FALLBACK = L("Sin identificar", "Unidentified");
 
 function num(value, digits, suffix) {
   if (typeof value !== "number" || !isFinite(value)) return "—";
@@ -131,7 +159,7 @@ function num(value, digits, suffix) {
 
 function money(value) {
   if (typeof value !== "number" || !isFinite(value)) return "—";
-  if (value === 0) return "gratis";
+  if (value === 0) return L("gratis", "free");
   if (value < 0.01) return "$" + value.toFixed(4);
   if (value < 10) return "$" + value.toFixed(2);
   return "$" + value.toFixed(1);
@@ -197,6 +225,19 @@ function vendorHex(vendor) {
 }
 
 var TIER_LABEL = { low: "bajo", medium: "medio", high: "alto", very_high: "muy alto", byok: "externo", unknown: "?" };
+// Las etiquetas de categoría de precio son texto de interfaz: se recomponen
+// con el idioma (igual que CAPABILITIES hace en client-bench.mjs).
+(function tierLabelLang() {
+  function refreshTiers() {
+    TIER_LABEL.low = L("bajo", "low");
+    TIER_LABEL.medium = L("medio", "medium");
+    TIER_LABEL.high = L("alto", "high");
+    TIER_LABEL.very_high = L("muy alto", "very high");
+    TIER_LABEL.byok = L("externo", "external");
+  }
+  refreshTiers();
+  langRefreshers.push(refreshTiers);
+})();
 
 function tierChip(tier) {
   return el("span", { className: "chip", dataset: { tier: tier || "unknown" }, textContent: TIER_LABEL[tier] || tier || "?" });
@@ -271,9 +312,21 @@ function providerOf(model) {
 
 function providerLabel(id) {
   for (var i = 0; i < catalog.length; i++) {
-    if (catalog[i].id === id) return catalog[i].label;
+    if (catalog[i].id === id) return localizeAutoProviderLabel(catalog[i].label);
   }
   return id;
+}
+
+// El servidor autogenera etiquetas de proveedor caído en español ("Proveedor
+// externo a1b2c3d4…"); al mostrarlas se traduce el prefijo conservando el
+// sufijo, y así el panel se lee en el idioma activo.
+var AUTO_PROVIDER_PREFIX = "Proveedor externo";
+function localizeAutoProviderLabel(label) {
+  if (typeof label !== "string" || label.indexOf(AUTO_PROVIDER_PREFIX) !== 0) return label;
+  return L(AUTO_PROVIDER_PREFIX, "External provider") + label.slice(AUTO_PROVIDER_PREFIX.length);
+}
+function isAutoProviderLabel(label) {
+  return typeof label === "string" && (label.indexOf(AUTO_PROVIDER_PREFIX) === 0 || label.indexOf("External provider") === 0);
 }
 
 /** The models every ranking, chart and scene works from. */
@@ -380,7 +433,7 @@ function renderFilterBar() {
   });
 
   var providers = clear("providerFilter");
-  providers.append(toggleButton("Todos (" + allModels().length + ")", filters.provider === "all",
+  providers.append(toggleButton(L("Todos ", "All ") + "(" + allModels().length + ")", filters.provider === "all",
     function () { filters.provider = "all"; filters.picked = null; modelFilterExpanded = false; renderFiltered(); }));
   ids.forEach(function (id) {
     providers.append(toggleButton(providerLabel(id) + " (" + counts[id] + ")", filters.provider === id, function () {
@@ -395,7 +448,7 @@ function renderFilterBar() {
   var host = clear("modelFilter");
   var visible = activeModels();
   if (!visible.length) {
-    host.append(el("span", { className: "small muted", textContent: "Ningún modelo seleccionado." }));
+    host.append(el("span", { className: "small muted", textContent: L("Ningún modelo seleccionado.", "No models selected.") }));
   } else {
     // Con el catálogo completo son cientos de chips: se muestra un trozo y el
     // resto tras «Mostrar todos», para que la barra no ocupe media pantalla.
@@ -409,7 +462,7 @@ function renderFilterBar() {
     if (visible.length > LIMIT) {
       var more = el("button", {
         className: "toggle mf-more", type: "button",
-        textContent: modelFilterExpanded ? "Ver menos" : "Mostrar los " + visible.length + " modelos ▾",
+        textContent: modelFilterExpanded ? L("Ver menos", "Show less") : L("Mostrar los ", "Show the ") + visible.length + L(" modelos ▾", " models ▾"),
         onclick: function () { modelFilterExpanded = !modelFilterExpanded; renderFilterBar(); }
       });
       host.append(more);
@@ -418,19 +471,19 @@ function renderFilterBar() {
 
   var actions = clear("filterActions");
   actions.append(el("button", {
-    className: "toggle", type: "button", textContent: "Todos",
+    className: "toggle", type: "button", textContent: L("Todos", "All"),
     onclick: function () { filters.picked = null; renderFiltered(); }
   }));
   actions.append(el("button", {
-    className: "toggle", type: "button", textContent: "Ninguno",
+    className: "toggle", type: "button", textContent: L("Ninguno", "None"),
     onclick: function () { filters.picked = {}; renderFiltered(); }
   }));
-  actions.append(toggleButton("Solo mis modelos", onlyMine, function () {
+  actions.append(toggleButton(L("Solo mis modelos", "My models only"), onlyMine, function () {
     onlyMine = !onlyMine;
     renderFiltered();
   }));
   actions.append(el("button", {
-    className: "toggle", type: "button", textContent: "Quitar filtros",
+    className: "toggle", type: "button", textContent: L("Quitar filtros", "Clear filters"),
     onclick: clearFilters
   }));
 
@@ -442,20 +495,18 @@ function renderFilterNote() {
   var visible = activeModels().length;
   var parts = [];
   if (!filterActive()) {
-    parts.push("Sin filtro: las recomendaciones, el gráfico y la tabla usan los " + total + " modelos que tienes.");
-    parts.push("Elige un proveedor o desmarca modelos para ver qué conviene dentro de ese subconjunto.");
+    parts.push(L("Sin filtro: las recomendaciones, el gráfico y la tabla usan los ", "No filter: recommendations, chart, and table use your ") + total + L(" modelos que tienes.", " models."));
+    parts.push(L("Elige un proveedor o desmarca modelos para ver qué conviene dentro de ese subconjunto.", "Pick a provider or uncheck models to see what works best within that subset."));
   } else {
-    parts.push("Filtro activo: " + visible + " de " + total + " modelos.");
-    if (filters.provider !== "all") parts.push("Proveedor: " + providerLabel(filters.provider) + ".");
-    if (filters.picked) parts.push("Selección manual de modelos.");
-    parts.push("Las recomendaciones de la pestaña Enrutado se están calculando solo con estos modelos.");
+    parts.push(L("Filtro activo: ", "Filter active: ") + visible + L(" de ", " of ") + total + L(" modelos.", " models."));
+    if (filters.provider !== "all") parts.push(L("Proveedor: ", "Provider: ") + providerLabel(filters.provider) + ".");
+    if (filters.picked) parts.push(L("Selección manual de modelos.", "Manual model selection."));
+    parts.push(L("Las recomendaciones de la pestaña Enrutado se están calculando solo con estos modelos.", "Recommendations in the Routing tab are now computed only from these models."));
   }
-  parts.push("Las notas salen del ranking público; si tu modelo no está medido directamente, " +
-    "se estima a partir de variantes de su familia y se marca con ~. Un modelo sin ninguna " +
-    "referencia se evalúa solo por precio y velocidad, y la tarjeta lo avisa.");
+  parts.push(L("Las notas salen del ranking público; si tu modelo no está medido directamente, se estima a partir de variantes de su familia y se marca con ~. Un modelo sin ninguna referencia se evalúa solo por precio y velocidad, y la tarjeta lo avisa.", "Notes come from the public ranking; if your model is not measured directly, it is estimated from variants of its family and marked with ~. A model with no reference is judged only by price and speed, and the card says so."));
   parts.push(onlyMine
-    ? "La tabla y el mapa 3D muestran solo los modelos que puedes elegir; quita el boton Solo mis modelos para ver todo el campo publico."
-    : "La tabla y el mapa 3D muestran todo el campo publico; las filas y esferas resaltadas son los modelos que tienes.");
+    ? L("La tabla y el mapa 3D muestran solo los modelos que puedes elegir; quita el boton Solo mis modelos para ver todo el campo publico.", "The table and 3D map show only the models you can pick; turn off My models only to see the full public field.")
+    : L("La tabla y el mapa 3D muestran todo el campo publico; las filas y esferas resaltadas son los modelos que tienes.", "The table and 3D map show the whole public field; highlighted rows and spheres are your models."));
   document.getElementById("filterNote").textContent = parts.join(" ");
 }
 
@@ -470,15 +521,15 @@ function renderFilterBanner() {
       var pid = filters.provider;
       var plabel = providerLabel(pid);
       // Show full provider ID when the label is a generated fallback (starts with "Proveedor externo").
-      var showId = plabel.indexOf("Proveedor externo") === 0;
+      var showId = isAutoProviderLabel(plabel);
       providerInfo = " (" + plabel + (showId ? " — ID: " + pid + ")" : ")");
     }
     host.append(el("span", {
-      textContent: "Estas recomendaciones usan " + activeModels().length + " de " + allModels().length +
-        " modelos" + providerInfo + "."
+      textContent: L("Estas recomendaciones usan ", "These recommendations use ") + activeModels().length +
+        L(" de ", " of ") + allModels().length + L(" modelos", " models") + providerInfo + "."
     }));
   host.append(el("button", {
-    className: "toggle", type: "button", textContent: "Quitar filtros", onclick: clearFilters
+    className: "toggle", type: "button", textContent: L("Quitar filtros", "Clear filters"), onclick: clearFilters
   }));
 }
 
@@ -504,7 +555,7 @@ function setStatus(text, tone) {
 
 function markDirty() {
   dirty = true;
-  setStatus("Hay cambios sin guardar.", "warn");
+  setStatus(L("Hay cambios sin guardar.", "Unsaved changes."), "warn");
 }
 
 // --- scoring ----------------------------------------------------------------
@@ -530,49 +581,31 @@ function speedScore(model) {
  * "weights" say how much quality, cost and speed matter for that role.
  */
 var ROLE_PLAYBOOK = [
-  {
-    type: "explore",
-    what: "Busca y lee muchos archivos. Mucho volumen y poca profundidad.",
-    keys: ["total"],
-    weights: { capability: 0.35, cost: 0.5, speed: 0.15 },
-    why: "Se lanza decenas de veces por tarea, así que manda el precio. La calidad solo tiene que bastar para no perder el hilo."
-  },
-  {
-    type: "task",
-    what: "Ejecuta una tarea acotada de principio a fin.",
-    keys: ["total", "agent"],
-    weights: { capability: 0.6, cost: 0.3, speed: 0.1 },
-    why: "El equilibrio: se repite mucho, pero un fallo obliga a repetir el trabajo entero."
-  },
-  {
-    type: "general-purpose",
-    what: "Trabajo abierto que puede necesitar herramientas y varios pasos.",
-    keys: ["total", "agent", "tau"],
-    weights: { capability: 0.65, cost: 0.25, speed: 0.1 },
-    why: "Además de razonar tiene que saber encadenar llamadas a herramientas sin perderse."
-  },
-  {
-    type: "code-review",
-    what: "Lee un cambio y busca fallos reales.",
-    keys: ["coding", "liveCodeBench"],
-    weights: { capability: 0.9, cost: 0.05, speed: 0.05 },
-    why: "Aquí sí compensa pagar: un fallo que se escapa cuesta mucho más que la diferencia de precio."
-  },
-  {
-    type: "research",
-    what: "Investiga en la web y en el repositorio, y sintetiza.",
-    keys: ["tau", "agent", "total"],
-    weights: { capability: 0.6, cost: 0.3, speed: 0.1 },
-    why: "Son muchas llamadas encadenadas: importa la fiabilidad siguiendo instrucciones con herramientas."
-  },
-  {
-    type: "security-review",
-    what: "Busca vulnerabilidades explotables.",
-    keys: ["reasoning", "total"],
-    weights: { capability: 0.85, cost: 0.1, speed: 0.05 },
-    why: "El caso donde el razonamiento profundo pesa más que el precio. Mejor el modelo más capaz que tengas."
-  }
+  { type: "explore", keys: ["total"], weights: { capability: 0.35, cost: 0.5, speed: 0.15 } },
+  { type: "task", keys: ["total", "agent"], weights: { capability: 0.6, cost: 0.3, speed: 0.1 } },
+  { type: "general-purpose", keys: ["total", "agent", "tau"], weights: { capability: 0.65, cost: 0.25, speed: 0.1 } },
+  { type: "code-review", keys: ["coding", "liveCodeBench"], weights: { capability: 0.9, cost: 0.05, speed: 0.05 } },
+  { type: "research", keys: ["tau", "agent", "total"], weights: { capability: 0.6, cost: 0.3, speed: 0.1 } },
+  { type: "security-review", keys: ["reasoning", "total"], weights: { capability: 0.85, cost: 0.1, speed: 0.05 } }
 ];
+
+// Mutated in place so lang switches update every card that holds a reference.
+function refreshRolePlaybook() {
+  ROLE_PLAYBOOK[0].what = L("Busca y lee muchos archivos. Mucho volumen y poca profundidad.", "Searches and reads many files. High volume, low depth.");
+  ROLE_PLAYBOOK[0].why = L("Se lanza decenas de veces por tarea, así que manda el precio. La calidad solo tiene que bastar para no perder el hilo.", "Runs dozens of times per task, so price rules. Quality just needs to not lose the thread.");
+  ROLE_PLAYBOOK[1].what = L("Ejecuta una tarea acotada de principio a fin.", "Executes a bounded task end to end.");
+  ROLE_PLAYBOOK[1].why = L("El equilibrio: se repite mucho, pero un fallo obliga a repetir el trabajo entero.", "The balance: it runs often, but one failure means redoing the whole job.");
+  ROLE_PLAYBOOK[2].what = L("Trabajo abierto que puede necesitar herramientas y varios pasos.", "Open-ended work that may need tools and several steps.");
+  ROLE_PLAYBOOK[2].why = L("Además de razonar tiene que saber encadenar llamadas a herramientas sin perderse.", "Besides reasoning, it must chain tool calls without getting lost.");
+  ROLE_PLAYBOOK[3].what = L("Lee un cambio y busca fallos reales.", "Reads a change and hunts for real defects.");
+  ROLE_PLAYBOOK[3].why = L("Aquí sí compensa pagar: un fallo que se escapa cuesta mucho más que la diferencia de precio.", "Paying pays off here: a missed bug costs far more than the price gap.");
+  ROLE_PLAYBOOK[4].what = L("Investiga en la web y en el repositorio, y sintetiza.", "Researches the web and the repository, then synthesizes.");
+  ROLE_PLAYBOOK[4].why = L("Son muchas llamadas encadenadas: importa la fiabilidad siguiendo instrucciones con herramientas.", "Many chained calls: reliability following instructions with tools matters.");
+  ROLE_PLAYBOOK[5].what = L("Busca vulnerabilidades explotables.", "Hunts for exploitable vulnerabilities.");
+  ROLE_PLAYBOOK[5].why = L("El caso donde el razonamiento profundo pesa más que el precio. Mejor el modelo más capaz que tengas.", "The case where deep reasoning outweighs price. Use the most capable model you have.");
+}
+langRefreshers.push(refreshRolePlaybook);
+refreshRolePlaybook();
 
 function rolePlaybook(type) {
   for (var i = 0; i < ROLE_PLAYBOOK.length; i++) {
@@ -580,10 +613,10 @@ function rolePlaybook(type) {
   }
   return {
     type: type,
-    what: "Subagente personalizado.",
+    what: L("Subagente personalizado.", "Custom subagent."),
     keys: ["total"],
     weights: { capability: 0.6, cost: 0.3, speed: 0.1 },
-    why: "Sin perfil propio: se juzga por nota global, precio y velocidad."
+    why: L("Sin perfil propio: se juzga por nota global, precio y velocidad.", "No dedicated profile: judged by overall score, price, and speed.")
   };
 }
 

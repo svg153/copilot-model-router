@@ -1,9 +1,25 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Model Router</title>
+<script>
+(function () {
+    // El script del <head> fija el idioma ANTES de pintar el body: preferencia
+    // guardada en localStorage o, si no hay ninguna, el idioma del navegador.
+    // CSS decide cuál de las dos cadenas estáticas (.ie / .ien) se ve.
+    var lang = "es";
+    try {
+        var saved = localStorage.getItem("mr-lang");
+        if (saved === "es" || saved === "en") lang = saved;
+        else if (String(navigator.language || "").toLowerCase().indexOf("en") === 0) lang = "en";
+    } catch (e) {}
+    var root = document.documentElement;
+    root.setAttribute("data-lang", lang);
+    root.setAttribute("lang", lang);
+})();
+</script>
 <style>
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
@@ -21,6 +37,23 @@ body {
 }
 header { padding: 22px 0 14px; }
 .head-row { display: flex; align-items: flex-start; gap: 14px; }
+/* ── Bilingüe ES/EN ───────────────────────────────────────────────────────
+   Cada cadena estática vive duplicada en dos spans (.ie español, .ien
+   inglés); sólo uno se muestra según html[data-lang], que fija el script
+   del head al cargar y el botón ES|EN al alternar. */
+html[data-lang="en"] .ie { display: none; }
+html:not([data-lang="en"]) .ien { display: none; }
+.lang-toggle {
+    margin-left: auto; flex: none;
+    display: inline-flex; align-items: center; gap: 0;
+    padding: 4px 2px; background: none; border: none; cursor: pointer;
+    font: inherit; font-size: 12px; letter-spacing: 0.04em; color: var(--text-color-muted, #59636e);
+}
+.lang-toggle:hover { color: var(--text-color-default, #1f2328); }
+.lang-toggle .lt-sep { padding: 0 5px; opacity: 0.55; }
+.lang-toggle .lt-opt { font-weight: 600; opacity: 0.45; }
+html:not([data-lang="en"]) .lang-toggle .lt-es,
+html[data-lang="en"] .lang-toggle .lt-en { opacity: 1; }
 .logo {
     flex: none; width: 44px; height: 44px; border-radius: 12px;
     display: grid; place-items: center; color: #ffffff;
@@ -486,62 +519,53 @@ h2::before {
     </div>
     <div>
       <h1>Model Router</h1>
-      <p class="sub">
-        Decide qué modelo atiende cada tarea: los del plan de GitHub Copilot para lo que exige calidad,
-        y los del proveedor externo (tu propia clave, sin coste por petición premium) para el trabajo masivo.
-      </p>
+      <p class="sub"><span class="ie">Decide qué modelo atiende cada tarea: los del plan de GitHub Copilot para lo que exige calidad, y los del proveedor externo (tu propia clave, sin coste por petición premium) para el trabajo masivo.</span><span class="ien">Decide which model handles each task: GitHub Copilot plan models for quality-critical work, and external-provider models (your own key, no per-request premium cost) for bulk work.</span></p>
     </div>
+    <button id="langToggle" class="lang-toggle" type="button" title="Cambiar idioma / Change language" aria-label="Cambiar idioma / Change language"><span class="lt-opt lt-es">ES</span><span class="lt-sep">|</span><span class="lt-opt lt-en">EN</span></button>
   </div>
 </header>
 
 <div class="bar-top">
-  <button id="apply" class="primary">Guardar y aplicar</button>
-  <button id="reset" class="danger">Restaurar valores por defecto</button>
-  <button id="refresh">Actualizar datos</button>
+  <button id="apply" class="primary"><span class="ie">Guardar y aplicar</span><span class="ien">Save and apply</span></button>
+  <button id="reset" class="danger"><span class="ie">Restaurar valores por defecto</span><span class="ien">Restore defaults</span></button>
+  <button id="refresh"><span class="ie">Actualizar datos</span><span class="ien">Refresh data</span></button>
   <span id="status" class="status"></span>
 </div>
 
 <nav class="tabs" id="tabs">
-  <button data-tab="routing" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>Enrutado</button>
-  <button data-tab="catalog" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>Catálogo</button>
-  <button data-tab="bench" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>Comparativa</button>
+  <button data-tab="routing" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg><span class="ie">Enrutado</span><span class="ien">Routing</span></button>
+  <button data-tab="catalog" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg><span class="ie">Catálogo</span><span class="ien">Catalog</span></button>
+  <button data-tab="bench" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg><span class="ie">Comparativa</span><span class="ien">Benchmarks</span></button>
   <button data-tab="scene" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>3D</button>
-  <button data-tab="guide" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>Guía</button>
+  <button data-tab="guide" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg><span class="ie">Guía</span><span class="ien">Guide</span></button>
 </nav>
 
 <section class="panel" data-panel="routing" data-active="true">
   <div class="banner" id="filterBanner" style="display:none"></div>
   <div class="section">
-    <h2>Roles del flujo de trabajo</h2>
-    <p class="sub">
-      El flujo de trabajo <span class="mono">orchestrate → plan → execute → verify</span> tiene cuatro etapas.
-      Orchestrate descompone la tarea y entrega los objetivos a Plan; no implementa cambios.
-      Elige aquí el modelo y el esfuerzo de razonamiento de cada etapa.
-    </p>
+    <h2><span class="ie">Roles del flujo de trabajo</span><span class="ien">Workflow roles</span></h2>
+    <p class="sub"><span class="ie">El flujo de trabajo <span class="mono">orchestrate → plan → execute → verify</span> tiene cuatro etapas. Orchestrate descompone la tarea y entrega los objetivos a Plan; no implementa cambios. Elige aquí el modelo y el esfuerzo de razonamiento de cada etapa.</span><span class="ien">The workflow <span class="mono">orchestrate → plan → execute → verify</span> has four stages. Orchestrate breaks down the task and hands the goals to Plan; it does not implement changes. Choose the model and reasoning effort for each stage here.</span></p>
     <div id="roles"></div>
   </div>
 
   <div class="section">
-    <h2>Subagentes fijados</h2>
-    <p class="sub">
-      Los subagentes que lanza el agente principal (búsquedas, revisiones, investigaciones).
-      Fijar un modelo aquí evita que cada llamada elija por su cuenta uno más caro.
-    </p>
+    <h2><span class="ie">Subagentes fijados</span><span class="ien">Pinned subagents</span></h2>
+    <p class="sub"><span class="ie">Los subagentes que lanza el agente principal (búsquedas, revisiones, investigaciones). Fijar un modelo aquí evita que cada llamada elija por su cuenta uno más caro.</span><span class="ien">The subagents launched by the main agent (searches, reviews, investigations). Pinning a model here stops each call from choosing a pricier one on its own.</span></p>
     <div id="subagents"></div>
   </div>
 
   <div class="section">
-    <h2>Qué significa cada ajuste</h2>
+    <h2><span class="ie">Qué significa cada ajuste</span><span class="ien">What each setting means</span></h2>
     <dl class="defs" id="routingDefs"></dl>
   </div>
 </section>
 
 <section class="panel" data-panel="catalog">
   <div class="section">
-    <h2>Catálogo en vivo y diagnósticos de enrutado</h2>
-    <p class="sub" id="catalogSub">Modelos reportados por el runtime de la sesión actual. Esto no es un registro de proveedores ni una prueba de credenciales.</p>
+    <h2><span class="ie">Catálogo en vivo y diagnósticos de enrutado</span><span class="ien">Live catalog and routing diagnostics</span></h2>
+    <p class="sub" id="catalogSub"><span class="ie">Modelos reportados por el runtime de la sesión actual. Esto no es un registro de proveedores ni una prueba de credenciales.</span><span class="ien">Models reported by the current session's runtime. This is not a provider registry nor a credential check.</span></p>
     <div class="bar-top" style="margin-bottom:10px">
-      <button id="refreshCatalog">Actualizar modelos de la sesión</button>
+      <button id="refreshCatalog"><span class="ie">Actualizar modelos de la sesión</span><span class="ien">Refresh session models</span></button>
       <span id="catalogRefreshStatus" class="status"></span>
     </div>
     <div id="catalogDiagnostics"></div>
@@ -549,71 +573,38 @@ h2::before {
     <div class="tablewrap"><table id="catalogTable"></table></div>
   </div>
   <div class="section">
-    <h2>Añadir o verificar un proveedor de modelos</h2>
-    <p class="sub">
-      En la app de escritorio GitHub Copilot, abre <strong>Settings → Model providers → Add provider</strong>,
-      guarda el proveedor y después selecciona uno de sus modelos en el selector de modelos de la app. Las
-      credenciales del proveedor las gestiona la app. Actualiza este catálogo desde la sesión actual: un
-      proveedor que aparezca en los ajustes de la app pero no aquí no lo expone el RPC de lista de modelos
-      de esta sesión.
-    </p>
-    <p class="sub">
-      Para la Copilot CLI independiente, configura <code>~/.copilot/providers.json</code> (o la ruta en
-      <code>COPILOT_PROVIDERS_CONFIG</code>) y reinicia la CLI. El archivo de proveedores de la CLI guarda
-      las credenciales en texto plano; mantenlo privado y nunca lo confirmes. Que un proveedor esté
-      registrado y un ID de modelo aparezca en este router no prueba que la sesión actual pueda invocar
-      ese modelo.
-    </p>
-    <p class="sub">
-      Consulta las guías oficiales de GitHub:
-      <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en la app de Copilot</a>
-      y
-      <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en Copilot CLI</a>.
-    </p>
+    <h2><span class="ie">Añadir o verificar un proveedor de modelos</span><span class="ien">Add or verify a model provider</span></h2>
+    <p class="sub"><span class="ie">En la app de escritorio GitHub Copilot, abre <strong>Settings → Model providers → Add provider</strong>, guarda el proveedor y después selecciona uno de sus modelos en el selector de modelos de la app. Las credenciales del proveedor las gestiona la app. Actualiza este catálogo desde la sesión actual: un proveedor que aparezca en los ajustes de la app pero no aquí no lo expone el RPC de lista de modelos de esta sesión.</span><span class="ien">In the GitHub Copilot desktop app, open <strong>Settings → Model providers → Add provider</strong>, save the provider, then pick one of its models in the app's model picker. The app manages the provider credentials. Refresh this catalog from the current session: a provider that shows up in the app settings but not here is not exposed by this session's model-list RPC.</span></p>
+    <p class="sub"><span class="ie">Para la Copilot CLI independiente, configura <code>~/.copilot/providers.json</code> (o la ruta en <code>COPILOT_PROVIDERS_CONFIG</code>) y reinicia la CLI. El archivo de proveedores de la CLI guarda las credenciales en texto plano; mantenlo privado y nunca lo confirmes. Que un proveedor esté registrado y un ID de modelo aparezca en este router no prueba que la sesión actual pueda invocar ese modelo.</span><span class="ien">For the standalone Copilot CLI, configure <code>~/.copilot/providers.json</code> (or the path in <code>COPILOT_PROVIDERS_CONFIG</code>) and restart the CLI. The CLI's providers file stores credentials in plain text; keep it private and never commit it. A provider being registered and a model ID showing up in this router does not prove the current session can invoke that model.</span></p>
+    <p class="sub"><span class="ie">Consulta las guías oficiales de GitHub: <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en la app de Copilot</a> y <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en Copilot CLI</a>.</span><span class="ien">See GitHub's official guides: <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">providers in the Copilot app</a> and <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">providers in Copilot CLI</a>.</span></p>
   </div>
   <div class="section">
-    <h2>Columnas</h2>
+    <h2><span class="ie">Columnas</span><span class="ien">Columns</span></h2>
     <dl class="defs" id="catalogDefs"></dl>
   </div>
     <div class="section">
-      <h2>Etiquetas de proveedor</h2>
-      <p class="sub">
-        Asigna un nombre legible a cada proveedor externo. El ID (UUID o hostname) se usa internamente;
-        la etiqueta es lo que se muestra en la interfaz. Escribe el ID completo del proveedor y el nombre
-        que quieras; pulsa <strong>Agregar</strong> y luego <strong>Guardar y aplicar</strong> para que surta efecto.
-      </p>
+      <h2><span class="ie">Etiquetas de proveedor</span><span class="ien">Provider labels</span></h2>
+      <p class="sub"><span class="ie">Asigna un nombre legible a cada proveedor externo. El ID (UUID o hostname) se usa internamente; la etiqueta es lo que se muestra en la interfaz. Escribe el ID completo del proveedor y el nombre que quieras; pulsa <strong>Agregar</strong> y luego <strong>Guardar y aplicar</strong> para que surta efecto.</span><span class="ien">Give each external provider a readable name. The ID (UUID or hostname) is used internally; the label is what's shown in the UI. Enter the provider's full ID and the name you want; press <strong>Add</strong>, then <strong>Save and apply</strong> for it to take effect.</span></p>
       <div id="providerLabelsEditor"></div>
     </div>
   </section>
 
 <section class="panel" data-panel="bench">
   <div class="section">
-    <h2>Qué modelo conviene para cada tarea</h2>
-    <p class="sub">
-      La recomendación combina <strong>calidad</strong> (notas de benchmarks públicos), <strong>coste</strong>
-      y <strong>velocidad</strong>, con un peso distinto según lo que haga el subagente. No hay una sola
-      respuesta correcta: hay una respuesta correcta para cada tipo de trabajo.
-    </p>
-    <p class="sub">
-      La puntuación de <strong>encaje</strong> va de 0 a 100 y se lee así: la calidad se mide solo con los
-      benchmarks que de verdad evaluan esa tarea (por ejemplo <code>coding</code> para revisar código), y se
-      compara contra los 88 modelos del ranking público para que 100 sea el mejor medido y 0 el peor. El coste
-      y la velocidad entran con el peso que indique cada tarjeta. Los modelos que <strong>no</strong> aparecen en
-      ningún benchmark reciben la media de los medidos en lugar de una ventaja: antes un modelo sin datos
-      ganaba por barato, lo cual no era información, era ruido. Cuando el ganador no tiene datos se avisa en
-      la propia tarjeta.
-    </p>
+    <h2><span class="ie">Qué modelo conviene para cada tarea</span><span class="ien">Which model fits each task</span></h2>
+    <p class="sub"><span class="ie">La recomendación combina <strong>calidad</strong> (notas de benchmarks públicos), <strong>coste</strong> y <strong>velocidad</strong>, con un peso distinto según lo que haga el subagente. No hay una sola respuesta correcta: hay una respuesta correcta para cada tipo de trabajo.</span><span class="ien">The recommendation combines <strong>quality</strong> (public benchmark scores), <strong>cost</strong>, and <strong>speed</strong>, weighted differently depending on what the subagent does. There is no single right answer: there's a right answer for each type of work.</span></p>
+    <p class="sub"><span class="ie">La puntuación de <strong>encaje</strong> va de 0 a 100 y se lee así: la calidad se mide solo con los benchmarks que de verdad evaluan esa tarea (por ejemplo <code>coding</code> para revisar código), y se compara contra los 88 modelos del ranking público para que 100 sea el mejor medido y 0 el peor. El coste y la velocidad entran con el peso que indique cada tarjeta. Los modelos que <strong>no</strong> aparecen en ningún benchmark reciben la media de los medidos en lugar de una ventaja: antes un modelo sin datos ganaba por barato, lo cual no era información, era ruido. Cuando el ganador no tiene datos se avisa en la propia tarjeta.</span><span class="ien">The <strong>fit</strong> score runs from 0 to 100 and reads like this: quality is measured only against the benchmarks that actually evaluate that task (for example <code>coding</code> for code review), and compared against the 88 models in the public ranking so that 100 is the best measured and 0 the worst. Cost and speed enter with the weight each card indicates. Models that do <strong>not</strong> appear in any benchmark get the average of the measured ones instead of an advantage: before, a model without data won just for being cheap, which wasn't information, it was noise. When the winner has no data, the card itself warns about it.</span></p>
     <div class="filters">
       <div class="filters-row">
-        <span class="filters-label">Proveedor</span>
+        <span class="filters-label"><span class="ie">Proveedor</span><span class="ien">Provider</span></span>
         <span id="providerFilter"></span>
       </div>
       <div class="filters-row">
-        <span class="filters-label">Modelos</span>
+        <span class="filters-label"><span class="ie">Modelos</span><span class="ien">Models</span></span>
         <span id="modelFilter"></span>
       </div>
       <div class="filters-row">
-        <span class="filters-label">Atajos</span>
+        <span class="filters-label"><span class="ie">Atajos</span><span class="ien">Shortcuts</span></span>
         <span id="filterActions"></span>
       </div>
       <div class="note" id="filterNote" style="margin:0"></div>
@@ -623,30 +614,22 @@ h2::before {
   </div>
 
   <div class="section">
-    <h2>Perfil del modelo seleccionado</h2>
-    <p class="sub" id="profileSub">Haz clic en cualquier fila de la tabla de abajo para ver su perfil.</p>
+    <h2><span class="ie">Perfil del modelo seleccionado</span><span class="ien">Selected model profile</span></h2>
+    <p class="sub" id="profileSub"><span class="ie">Haz clic en cualquier fila de la tabla de abajo para ver su perfil.</span><span class="ien">Click any row in the table below to see its profile.</span></p>
     <div id="profile"></div>
   </div>
 
   <div class="section">
-    <h2>Coste frente a calidad</h2>
-    <p class="sub">
-      Cada punto es un modelo. Cuanto más a la izquierda, más barato; cuanto más arriba, mejor nota global.
-      Lo ideal está arriba a la izquierda: bueno y barato.
-    </p>
+    <h2><span class="ie">Coste frente a calidad</span><span class="ien">Cost vs quality</span></h2>
+    <p class="sub"><span class="ie">Cada punto es un modelo. Cuanto más a la izquierda, más barato; cuanto más arriba, mejor nota global. Lo ideal está arriba a la izquierda: bueno y barato.</span><span class="ien">Each dot is a model. The further left, the cheaper; the further up, the better the overall score. Ideal is top-left: good and cheap.</span></p>
     <div class="scrollx"><div id="scatter"></div></div>
     <div class="legend" id="scatterLegend"></div>
-    <div class="note">
-      En los modelos del plan de Copilot el precio que se muestra es el <strong>precio de referencia de la API</strong>,
-      no lo que te cobra tu suscripción. Para esos modelos lo que cuenta de verdad es su categoría de precio
-      (<span class="mono">bajo</span>, <span class="mono">medio</span>, <span class="mono">alto</span>), que sí es
-      la que consume tu cuota.
-    </div>
+    <div class="note"><span class="ie">En los modelos del plan de Copilot el precio que se muestra es el <strong>precio de referencia de la API</strong>, no lo que te cobra tu suscripción. Para esos modelos lo que cuenta de verdad es su categoría de precio (<span class="mono">bajo</span>, <span class="mono">medio</span>, <span class="mono">alto</span>), que sí es la que consume tu cuota.</span><span class="ien">For Copilot plan models, the price shown is the <strong>API reference price</strong>, not what your subscription charges. For those models what really counts is their price tier (<span class="mono">low</span>, <span class="mono">medium</span>, <span class="mono">high</span>), which is what consumes your quota.</span></div>
   </div>
 
   <div class="section">
-    <h2>Tabla completa de benchmarks</h2>
-    <p class="sub" id="benchSub">Haz clic en una cabecera para ordenar.</p>
+    <h2><span class="ie">Tabla completa de benchmarks</span><span class="ien">Full benchmarks table</span></h2>
+    <p class="sub" id="benchSub"><span class="ie">Haz clic en una cabecera para ordenar.</span><span class="ien">Click a header to sort.</span></p>
     <div class="tablewrap"><table id="benchTable"></table></div>
     <div class="note" id="benchMeta"></div>
   </div>
@@ -654,85 +637,60 @@ h2::before {
 
 <section class="panel" data-panel="scene">
   <div class="section">
-    <h2>Mapa 3D del panorama</h2>
-    <p class="sub">
-      Arrastra para girar, usa la rueda para acercarte y pasa el ratón por encima de una esfera para ver el modelo.
-      Es la misma información que la pestaña Comparativa, pero vista como un terreno: se entiende de un vistazo
-      dónde está la frontera buena y barata. Arranca mostrando solo los modelos que puedes elegir, igual que la tabla.
-    </p>
+    <h2><span class="ie">Mapa 3D del panorama</span><span class="ien">3D overview map</span></h2>
+    <p class="sub"><span class="ie">Arrastra para girar, usa la rueda para acercarte y pasa el ratón por encima de una esfera para ver el modelo. Es la misma información que la pestaña Comparativa, pero vista como un terreno: se entiende de un vistazo dónde está la frontera buena y barata. Arranca mostrando solo los modelos que puedes elegir, igual que la tabla.</span><span class="ien">Drag to rotate, use the wheel to zoom, and hover over a sphere to see the model. It's the same information as the Benchmarks tab, but seen as a terrain: you can tell at a glance where the good-and-cheap frontier is. It starts showing only the models you can choose, just like the table.</span></p>
     <div class="bar-top" style="margin-bottom:10px">
-      <button id="sceneReset">Reencuadrar</button>
-      <button id="sceneSpin" aria-pressed="false">Girar solo</button>
-      <button id="sceneMine" class="toggle" aria-pressed="true">Solo mis modelos</button>
-      <button id="sceneEstimated" class="toggle" aria-pressed="true">Con estimadas (~)</button>
-      <button id="sceneUnpriced" class="toggle" aria-pressed="true">Con esferas sin precio</button>
+      <button id="sceneReset"><span class="ie">Reencuadrar</span><span class="ien">Re-frame</span></button>
+      <button id="sceneSpin" aria-pressed="false"><span class="ie">Girar solo</span><span class="ien">Spin only</span></button>
+      <button id="sceneMine" class="toggle" aria-pressed="true"><span class="ie">Solo mis modelos</span><span class="ien">Only my models</span></button>
+      <button id="sceneEstimated" class="toggle" aria-pressed="true"><span class="ie">Con estimadas (~)</span><span class="ien">With estimates (~)</span></button>
+      <button id="sceneUnpriced" class="toggle" aria-pressed="true"><span class="ie">Con esferas sin precio</span><span class="ien">With unpriced spheres</span></button>
       <span id="sceneStatus" class="status"></span>
     </div>
     <div class="scene" id="scene3d"><div class="tip" id="sceneTip"></div></div>
     <div class="axis-key" id="sceneAxes"></div>
     <div class="legend" id="sceneLegend"></div>
     <dl class="defs">
-      <dt>Eje horizontal (x)</dt>
-      <dd>Precio. A la izquierda lo barato, a la derecha lo caro. La escala es logarítmica, porque las diferencias de precio son enormes. Se marca en <b>ámbar</b>.</dd>
-      <dt>Eje vertical (y)</dt>
-      <dd>Nota global del benchmark. Arriba los mejores. Se marca en <b>verde</b>.</dd>
-      <dt>Profundidad (z)</dt>
-      <dd>Velocidad de salida, en tokens por segundo. Delante lo rápido, detrás lo lento. Se marca en <b>azul</b>.</dd>
-      <dt>Marco de referencia</dt>
-      <dd>
-        La caja, la rejilla del suelo y las tres flechas giran junto con las esferas, y los rótulos de los
-        extremos siempre miran a la cámara. Así no pierdes la orientación por mucho que gires: cada flecha
-        lleva escrito qué mide y en qué sentido crece, con los valores en los dos extremos.
-      </dd>
-      <dt>Tamaño de la esfera</dt>
-      <dd>Nota global: cuanto más grande, mejor.</dd>
-      <dt>Color</dt>
-      <dd>Fabricante. Un halo marca los modelos que lista el RPC en vivo de esta sesión; no confirma credenciales ni una inferencia con éxito.</dd>
-      <dt>Filtros del mapa</dt>
-      <dd>
-        <b>Solo mis modelos</b> arranca activado y deja en pantalla únicamente los modelos que puedes elegir, igual que
-        la tabla de la pestaña Comparativa; al quitarlo aparece todo el campo público para comparar. <b>Con estimadas (~)</b>
-        muestra u oculta las esferas cuya nota se dedujo de otras variantes de su familia en vez de medirse directamente.
-        <b>Con esferas sin precio</b> muestra u oculta el carril de la derecha. Los botones de color de la leyenda
-        filtran por fabricante: el primero que pulsas aísla ese fabricante y el botón <b>Todos los fabricantes</b> lo deshace.
-        El filtro de proveedor y modelos de la pestaña Enrutado se aplica encima, pero no borra esferas: atenúa las que
-        quedan fuera, para que el terreno siga siendo comparable.
-      </dd>
-      <dt>Esferas huecas</dt>
-      <dd>
-        Modelos que el benchmark público midió pero para los que no hay precio público. No pueden colocarse
-        en un eje de precio, así que van en su propio carril, a la derecha de la caja, con una línea
-        discontinua y el rótulo <b>sin precio público</b>. Se dibujan huecas para que nunca se lean como el
-        modelo más caro.
-      </dd>
+      <dt><span class="ie">Eje horizontal (x)</span><span class="ien">Horizontal axis (x)</span></dt>
+      <dd><span class="ie">Precio. A la izquierda lo barato, a la derecha lo caro. La escala es logarítmica, porque las diferencias de precio son enormes. Se marca en <b>ámbar</b>.</span><span class="ien">Price. Cheap on the left, expensive on the right. The scale is logarithmic, because price differences are huge. Marked in <b>amber</b>.</span></dd>
+      <dt><span class="ie">Eje vertical (y)</span><span class="ien">Vertical axis (y)</span></dt>
+      <dd><span class="ie">Nota global del benchmark. Arriba los mejores. Se marca en <b>verde</b>.</span><span class="ien">Overall benchmark score. Best at the top. Marked in <b>green</b>.</span></dd>
+      <dt><span class="ie">Profundidad (z)</span><span class="ien">Depth (z)</span></dt>
+      <dd><span class="ie">Velocidad de salida, en tokens por segundo. Delante lo rápido, detrás lo lento. Se marca en <b>azul</b>.</span><span class="ien">Output speed, in tokens per second. Fast at the front, slow at the back. Marked in <b>blue</b>.</span></dd>
+      <dt><span class="ie">Marco de referencia</span><span class="ien">Reference frame</span></dt>
+      <dd><span class="ie">La caja, la rejilla del suelo y las tres flechas giran junto con las esferas, y los rótulos de los extremos siempre miran a la cámara. Así no pierdes la orientación por mucho que gires: cada flecha lleva escrito qué mide y en qué sentido crece, con los valores en los dos extremos.</span><span class="ien">The box, the floor grid, and the three arrows rotate together with the spheres, and the end labels always face the camera. That way you don't lose orientation no matter how much you rotate: each arrow is labeled with what it measures and which direction it grows, with values at both ends.</span></dd>
+      <dt><span class="ie">Tamaño de la esfera</span><span class="ien">Sphere size</span></dt>
+      <dd><span class="ie">Nota global: cuanto más grande, mejor.</span><span class="ien">Overall score: the bigger, the better.</span></dd>
+      <dt><span class="ie">Color</span><span class="ien">Color</span></dt>
+      <dd><span class="ie">Fabricante. Un halo marca los modelos que lista el RPC en vivo de esta sesión; no confirma credenciales ni una inferencia con éxito.</span><span class="ien">Manufacturer. A halo marks the models listed by this session's live RPC; it doesn't confirm credentials or a successful inference.</span></dd>
+      <dt><span class="ie">Filtros del mapa</span><span class="ien">Map filters</span></dt>
+      <dd><span class="ie"><b>Solo mis modelos</b> arranca activado y deja en pantalla únicamente los modelos que puedes elegir, igual que la tabla de la pestaña Comparativa; al quitarlo aparece todo el campo público para comparar. <b>Con estimadas (~)</b> muestra u oculta las esferas cuya nota se dedujo de otras variantes de su familia en vez de medirse directamente. <b>Con esferas sin precio</b> muestra u oculta el carril de la derecha. Los botones de color de la leyenda filtran por fabricante: el primero que pulsas aísla ese fabricante y el botón <b>Todos los fabricantes</b> lo deshace. El filtro de proveedor y modelos de la pestaña Enrutado se aplica encima, pero no borra esferas: atenúa las que quedan fuera, para que el terreno siga siendo comparable.</span><span class="ien"><b>Only my models</b> starts enabled and keeps only the models you can choose on screen, just like the Benchmarks tab table; turning it off reveals the whole public field for comparison. <b>With estimates (~)</b> shows or hides the spheres whose score was inferred from other variants in their family rather than measured directly. <b>With unpriced spheres</b> shows or hides the right-hand lane. The colored legend buttons filter by manufacturer: the first one you click isolates that manufacturer, and the <b>All manufacturers</b> button undoes it. The provider and models filter from the Routing tab applies on top, but doesn't remove spheres: it dims the ones left out, so the terrain stays comparable.</span></dd>
+      <dt><span class="ie">Esferas huecas</span><span class="ien">Hollow spheres</span></dt>
+      <dd><span class="ie">Modelos que el benchmark público midió pero para los que no hay precio público. No pueden colocarse en un eje de precio, así que van en su propio carril, a la derecha de la caja, con una línea discontinua y el rótulo <b>sin precio público</b>. Se dibujan huecas para que nunca se lean como el modelo más caro.</span><span class="ien">Models the public benchmark measured but for which there is no public price. They can't be placed on a price axis, so they go in their own lane, to the right of the box, with a dashed line and the <b>no public price</b> label. They're drawn hollow so they're never read as the most expensive model.</span></dd>
     </dl>
   </div>
 </section>
 
 <section class="panel" data-panel="guide">
   <div class="section">
-    <h2>Guía rápida</h2>
-    <p class="sub">Todo lo que hace este panel, explicado sin dar nada por sabido.</p>
+    <h2><span class="ie">Guía rápida</span><span class="ien">Quick guide</span></h2>
+    <p class="sub"><span class="ie">Todo lo que hace este panel, explicado sin dar nada por sabido.</span><span class="ien">Everything this panel does, explained without assuming prior knowledge.</span></p>
     <dl class="defs" id="guideDefs"></dl>
   </div>
   <div class="section">
-    <h2>De dónde salen los datos</h2>
+    <h2><span class="ie">De dónde salen los datos</span><span class="ien">Where the data comes from</span></h2>
     <dl class="defs" id="sourceDefs"></dl>
     <div class="note" id="sourceMeta"></div>
   </div>
   <div class="section">
-    <h2>Traer tu propia clave</h2>
-    <p class="sub">
-      Los modelos que aparecen bajo un segundo proveedor no los sirve GitHub: se facturan contra la cuenta
-      de ese proveedor, con la clave que hayas configurado en la aplicación. Por eso en este panel se marcan
-      como <span class="mono">externo</span> y su precio se muestra en dólares de API, no en categorías del plan.
-      Son la pieza clave del ahorro: el trabajo repetitivo se va ahí y la cuota premium se reserva para pensar.
-    </p>
+    <h2><span class="ie">Traer tu propia clave</span><span class="ien">Bring your own key</span></h2>
+    <p class="sub"><span class="ie">Los modelos que aparecen bajo un segundo proveedor no los sirve GitHub: se facturan contra la cuenta de ese proveedor, con la clave que hayas configurado en la aplicación. Por eso en este panel se marcan como <span class="mono">externo</span> y su precio se muestra en dólares de API, no en categorías del plan. Son la pieza clave del ahorro: el trabajo repetitivo se va ahí y la cuota premium se reserva para pensar.</span><span class="ien">Models that appear under a second provider are not served by GitHub: they're billed against that provider's account, with the key you configured in the app. That's why this panel marks them as <span class="mono">external</span> and shows their price in API dollars, not plan tiers. They're the key to saving: repetitive work goes there and the premium quota is reserved for thinking.</span></p>
   </div>
 </section>
 
 <script>
 const BOOT = {"routing":{"version":2,"roles":{"orchestrate":{"model":"auto","reasoningEffort":"high"},"plan":{"model":"custom/opus","reasoningEffort":"high"},"execute":{"model":"custom/sonnet","reasoningEffort":"medium"},"verify":{"model":"custom/haiku","reasoningEffort":"low"}},"subagents":{"explore":{"model":"custom/flash","reasoningEffort":"low","required":true}}},"catalog":{"custom provider":{"models":[{"id":"custom/flash","label":"Flash","vendor":"custom","tier":"cheap","context":128000,"cost":{"input":0.1,"output":0.4},"reasoning":true}]}},"catalogDiagnostics":{"live":["custom/flash"],"missing":[],"fallback":[]},"benchmarks":{"rows":[],"meta":null,"source":"none"},"effortLevels":["minimal","low","medium","high","xhigh","max"],"subagentTypes":["explore","task","code-review"],"modelPolicies":["required","preferred","inherit"],"routerToken":"golden-test-token","routingRevision":"absent"};
+var UI_LANG = document.documentElement.getAttribute("data-lang") === "en" ? "en" : "es";
 
 var state = JSON.parse(JSON.stringify(BOOT.routing));
 // Last value known to be on disk, and its content fingerprint. The review
@@ -856,7 +814,35 @@ var CAPABILITIES = {
   language: "Idioma"
 };
 
-var VENDOR_FALLBACK = "Sin identificar";
+// ── Idioma de la interfaz (bilingüe ES/EN) ───────────────────────────────
+// UI_LANG lo fija el script del <head> (localStorage "mr-lang" o idioma del
+// navegador) y se lee aquí al arrancar el cliente. L(es, en) se evalúa en
+// tiempo de render: los textos dinámicos se cambian con volver a llamar a
+// renderAll(); los estáticos del body viven duplicados en spans .ie/.ien.
+var langRefreshers = [];
+function L(es, en) { return UI_LANG === "en" ? en : es; }
+function setLang(next) {
+    UI_LANG = next;
+    var root = document.documentElement;
+    root.setAttribute("data-lang", next);
+    root.setAttribute("lang", next);
+    try { localStorage.setItem("mr-lang", next); } catch (e) {}
+    VENDOR_FALLBACK = L("Sin identificar", "Unidentified");
+    langRefreshers.forEach(function (fn) { fn(); });
+}
+(function wireLangToggle() {
+    var btn = document.getElementById("langToggle");
+    if (!btn) return;
+    btn.onclick = function () {
+        setLang(UI_LANG === "es" ? "en" : "es");
+        if (typeof renderAll === "function") renderAll();
+    };
+})();
+// Las cadenas que viven en constantes de módulo (etiquetas de categoría,
+// textos de política...) se recomponen en sus propios ficheros registrándose
+// aquí con langRefreshers.push(...).
+
+var VENDOR_FALLBACK = L("Sin identificar", "Unidentified");
 
 function num(value, digits, suffix) {
   if (typeof value !== "number" || !isFinite(value)) return "—";
@@ -866,7 +852,7 @@ function num(value, digits, suffix) {
 
 function money(value) {
   if (typeof value !== "number" || !isFinite(value)) return "—";
-  if (value === 0) return "gratis";
+  if (value === 0) return L("gratis", "free");
   if (value < 0.01) return "$" + value.toFixed(4);
   if (value < 10) return "$" + value.toFixed(2);
   return "$" + value.toFixed(1);
@@ -932,6 +918,19 @@ function vendorHex(vendor) {
 }
 
 var TIER_LABEL = { low: "bajo", medium: "medio", high: "alto", very_high: "muy alto", byok: "externo", unknown: "?" };
+// Las etiquetas de categoría de precio son texto de interfaz: se recomponen
+// con el idioma (igual que CAPABILITIES hace en client-bench.mjs).
+(function tierLabelLang() {
+  function refreshTiers() {
+    TIER_LABEL.low = L("bajo", "low");
+    TIER_LABEL.medium = L("medio", "medium");
+    TIER_LABEL.high = L("alto", "high");
+    TIER_LABEL.very_high = L("muy alto", "very high");
+    TIER_LABEL.byok = L("externo", "external");
+  }
+  refreshTiers();
+  langRefreshers.push(refreshTiers);
+})();
 
 function tierChip(tier) {
   return el("span", { className: "chip", dataset: { tier: tier || "unknown" }, textContent: TIER_LABEL[tier] || tier || "?" });
@@ -1006,9 +1005,21 @@ function providerOf(model) {
 
 function providerLabel(id) {
   for (var i = 0; i < catalog.length; i++) {
-    if (catalog[i].id === id) return catalog[i].label;
+    if (catalog[i].id === id) return localizeAutoProviderLabel(catalog[i].label);
   }
   return id;
+}
+
+// El servidor autogenera etiquetas de proveedor caído en español ("Proveedor
+// externo a1b2c3d4…"); al mostrarlas se traduce el prefijo conservando el
+// sufijo, y así el panel se lee en el idioma activo.
+var AUTO_PROVIDER_PREFIX = "Proveedor externo";
+function localizeAutoProviderLabel(label) {
+  if (typeof label !== "string" || label.indexOf(AUTO_PROVIDER_PREFIX) !== 0) return label;
+  return L(AUTO_PROVIDER_PREFIX, "External provider") + label.slice(AUTO_PROVIDER_PREFIX.length);
+}
+function isAutoProviderLabel(label) {
+  return typeof label === "string" && (label.indexOf(AUTO_PROVIDER_PREFIX) === 0 || label.indexOf("External provider") === 0);
 }
 
 /** The models every ranking, chart and scene works from. */
@@ -1115,7 +1126,7 @@ function renderFilterBar() {
   });
 
   var providers = clear("providerFilter");
-  providers.append(toggleButton("Todos (" + allModels().length + ")", filters.provider === "all",
+  providers.append(toggleButton(L("Todos ", "All ") + "(" + allModels().length + ")", filters.provider === "all",
     function () { filters.provider = "all"; filters.picked = null; modelFilterExpanded = false; renderFiltered(); }));
   ids.forEach(function (id) {
     providers.append(toggleButton(providerLabel(id) + " (" + counts[id] + ")", filters.provider === id, function () {
@@ -1130,7 +1141,7 @@ function renderFilterBar() {
   var host = clear("modelFilter");
   var visible = activeModels();
   if (!visible.length) {
-    host.append(el("span", { className: "small muted", textContent: "Ningún modelo seleccionado." }));
+    host.append(el("span", { className: "small muted", textContent: L("Ningún modelo seleccionado.", "No models selected.") }));
   } else {
     // Con el catálogo completo son cientos de chips: se muestra un trozo y el
     // resto tras «Mostrar todos», para que la barra no ocupe media pantalla.
@@ -1144,7 +1155,7 @@ function renderFilterBar() {
     if (visible.length > LIMIT) {
       var more = el("button", {
         className: "toggle mf-more", type: "button",
-        textContent: modelFilterExpanded ? "Ver menos" : "Mostrar los " + visible.length + " modelos ▾",
+        textContent: modelFilterExpanded ? L("Ver menos", "Show less") : L("Mostrar los ", "Show the ") + visible.length + L(" modelos ▾", " models ▾"),
         onclick: function () { modelFilterExpanded = !modelFilterExpanded; renderFilterBar(); }
       });
       host.append(more);
@@ -1153,19 +1164,19 @@ function renderFilterBar() {
 
   var actions = clear("filterActions");
   actions.append(el("button", {
-    className: "toggle", type: "button", textContent: "Todos",
+    className: "toggle", type: "button", textContent: L("Todos", "All"),
     onclick: function () { filters.picked = null; renderFiltered(); }
   }));
   actions.append(el("button", {
-    className: "toggle", type: "button", textContent: "Ninguno",
+    className: "toggle", type: "button", textContent: L("Ninguno", "None"),
     onclick: function () { filters.picked = {}; renderFiltered(); }
   }));
-  actions.append(toggleButton("Solo mis modelos", onlyMine, function () {
+  actions.append(toggleButton(L("Solo mis modelos", "My models only"), onlyMine, function () {
     onlyMine = !onlyMine;
     renderFiltered();
   }));
   actions.append(el("button", {
-    className: "toggle", type: "button", textContent: "Quitar filtros",
+    className: "toggle", type: "button", textContent: L("Quitar filtros", "Clear filters"),
     onclick: clearFilters
   }));
 
@@ -1177,20 +1188,18 @@ function renderFilterNote() {
   var visible = activeModels().length;
   var parts = [];
   if (!filterActive()) {
-    parts.push("Sin filtro: las recomendaciones, el gráfico y la tabla usan los " + total + " modelos que tienes.");
-    parts.push("Elige un proveedor o desmarca modelos para ver qué conviene dentro de ese subconjunto.");
+    parts.push(L("Sin filtro: las recomendaciones, el gráfico y la tabla usan los ", "No filter: recommendations, chart, and table use your ") + total + L(" modelos que tienes.", " models."));
+    parts.push(L("Elige un proveedor o desmarca modelos para ver qué conviene dentro de ese subconjunto.", "Pick a provider or uncheck models to see what works best within that subset."));
   } else {
-    parts.push("Filtro activo: " + visible + " de " + total + " modelos.");
-    if (filters.provider !== "all") parts.push("Proveedor: " + providerLabel(filters.provider) + ".");
-    if (filters.picked) parts.push("Selección manual de modelos.");
-    parts.push("Las recomendaciones de la pestaña Enrutado se están calculando solo con estos modelos.");
+    parts.push(L("Filtro activo: ", "Filter active: ") + visible + L(" de ", " of ") + total + L(" modelos.", " models."));
+    if (filters.provider !== "all") parts.push(L("Proveedor: ", "Provider: ") + providerLabel(filters.provider) + ".");
+    if (filters.picked) parts.push(L("Selección manual de modelos.", "Manual model selection."));
+    parts.push(L("Las recomendaciones de la pestaña Enrutado se están calculando solo con estos modelos.", "Recommendations in the Routing tab are now computed only from these models."));
   }
-  parts.push("Las notas salen del ranking público; si tu modelo no está medido directamente, " +
-    "se estima a partir de variantes de su familia y se marca con ~. Un modelo sin ninguna " +
-    "referencia se evalúa solo por precio y velocidad, y la tarjeta lo avisa.");
+  parts.push(L("Las notas salen del ranking público; si tu modelo no está medido directamente, se estima a partir de variantes de su familia y se marca con ~. Un modelo sin ninguna referencia se evalúa solo por precio y velocidad, y la tarjeta lo avisa.", "Notes come from the public ranking; if your model is not measured directly, it is estimated from variants of its family and marked with ~. A model with no reference is judged only by price and speed, and the card says so."));
   parts.push(onlyMine
-    ? "La tabla y el mapa 3D muestran solo los modelos que puedes elegir; quita el boton Solo mis modelos para ver todo el campo publico."
-    : "La tabla y el mapa 3D muestran todo el campo publico; las filas y esferas resaltadas son los modelos que tienes.");
+    ? L("La tabla y el mapa 3D muestran solo los modelos que puedes elegir; quita el boton Solo mis modelos para ver todo el campo publico.", "The table and 3D map show only the models you can pick; turn off My models only to see the full public field.")
+    : L("La tabla y el mapa 3D muestran todo el campo publico; las filas y esferas resaltadas son los modelos que tienes.", "The table and 3D map show the whole public field; highlighted rows and spheres are your models."));
   document.getElementById("filterNote").textContent = parts.join(" ");
 }
 
@@ -1205,15 +1214,15 @@ function renderFilterBanner() {
       var pid = filters.provider;
       var plabel = providerLabel(pid);
       // Show full provider ID when the label is a generated fallback (starts with "Proveedor externo").
-      var showId = plabel.indexOf("Proveedor externo") === 0;
+      var showId = isAutoProviderLabel(plabel);
       providerInfo = " (" + plabel + (showId ? " — ID: " + pid + ")" : ")");
     }
     host.append(el("span", {
-      textContent: "Estas recomendaciones usan " + activeModels().length + " de " + allModels().length +
-        " modelos" + providerInfo + "."
+      textContent: L("Estas recomendaciones usan ", "These recommendations use ") + activeModels().length +
+        L(" de ", " of ") + allModels().length + L(" modelos", " models") + providerInfo + "."
     }));
   host.append(el("button", {
-    className: "toggle", type: "button", textContent: "Quitar filtros", onclick: clearFilters
+    className: "toggle", type: "button", textContent: L("Quitar filtros", "Clear filters"), onclick: clearFilters
   }));
 }
 
@@ -1239,7 +1248,7 @@ function setStatus(text, tone) {
 
 function markDirty() {
   dirty = true;
-  setStatus("Hay cambios sin guardar.", "warn");
+  setStatus(L("Hay cambios sin guardar.", "Unsaved changes."), "warn");
 }
 
 // --- scoring ----------------------------------------------------------------
@@ -1265,49 +1274,31 @@ function speedScore(model) {
  * "weights" say how much quality, cost and speed matter for that role.
  */
 var ROLE_PLAYBOOK = [
-  {
-    type: "explore",
-    what: "Busca y lee muchos archivos. Mucho volumen y poca profundidad.",
-    keys: ["total"],
-    weights: { capability: 0.35, cost: 0.5, speed: 0.15 },
-    why: "Se lanza decenas de veces por tarea, así que manda el precio. La calidad solo tiene que bastar para no perder el hilo."
-  },
-  {
-    type: "task",
-    what: "Ejecuta una tarea acotada de principio a fin.",
-    keys: ["total", "agent"],
-    weights: { capability: 0.6, cost: 0.3, speed: 0.1 },
-    why: "El equilibrio: se repite mucho, pero un fallo obliga a repetir el trabajo entero."
-  },
-  {
-    type: "general-purpose",
-    what: "Trabajo abierto que puede necesitar herramientas y varios pasos.",
-    keys: ["total", "agent", "tau"],
-    weights: { capability: 0.65, cost: 0.25, speed: 0.1 },
-    why: "Además de razonar tiene que saber encadenar llamadas a herramientas sin perderse."
-  },
-  {
-    type: "code-review",
-    what: "Lee un cambio y busca fallos reales.",
-    keys: ["coding", "liveCodeBench"],
-    weights: { capability: 0.9, cost: 0.05, speed: 0.05 },
-    why: "Aquí sí compensa pagar: un fallo que se escapa cuesta mucho más que la diferencia de precio."
-  },
-  {
-    type: "research",
-    what: "Investiga en la web y en el repositorio, y sintetiza.",
-    keys: ["tau", "agent", "total"],
-    weights: { capability: 0.6, cost: 0.3, speed: 0.1 },
-    why: "Son muchas llamadas encadenadas: importa la fiabilidad siguiendo instrucciones con herramientas."
-  },
-  {
-    type: "security-review",
-    what: "Busca vulnerabilidades explotables.",
-    keys: ["reasoning", "total"],
-    weights: { capability: 0.85, cost: 0.1, speed: 0.05 },
-    why: "El caso donde el razonamiento profundo pesa más que el precio. Mejor el modelo más capaz que tengas."
-  }
+  { type: "explore", keys: ["total"], weights: { capability: 0.35, cost: 0.5, speed: 0.15 } },
+  { type: "task", keys: ["total", "agent"], weights: { capability: 0.6, cost: 0.3, speed: 0.1 } },
+  { type: "general-purpose", keys: ["total", "agent", "tau"], weights: { capability: 0.65, cost: 0.25, speed: 0.1 } },
+  { type: "code-review", keys: ["coding", "liveCodeBench"], weights: { capability: 0.9, cost: 0.05, speed: 0.05 } },
+  { type: "research", keys: ["tau", "agent", "total"], weights: { capability: 0.6, cost: 0.3, speed: 0.1 } },
+  { type: "security-review", keys: ["reasoning", "total"], weights: { capability: 0.85, cost: 0.1, speed: 0.05 } }
 ];
+
+// Mutated in place so lang switches update every card that holds a reference.
+function refreshRolePlaybook() {
+  ROLE_PLAYBOOK[0].what = L("Busca y lee muchos archivos. Mucho volumen y poca profundidad.", "Searches and reads many files. High volume, low depth.");
+  ROLE_PLAYBOOK[0].why = L("Se lanza decenas de veces por tarea, así que manda el precio. La calidad solo tiene que bastar para no perder el hilo.", "Runs dozens of times per task, so price rules. Quality just needs to not lose the thread.");
+  ROLE_PLAYBOOK[1].what = L("Ejecuta una tarea acotada de principio a fin.", "Executes a bounded task end to end.");
+  ROLE_PLAYBOOK[1].why = L("El equilibrio: se repite mucho, pero un fallo obliga a repetir el trabajo entero.", "The balance: it runs often, but one failure means redoing the whole job.");
+  ROLE_PLAYBOOK[2].what = L("Trabajo abierto que puede necesitar herramientas y varios pasos.", "Open-ended work that may need tools and several steps.");
+  ROLE_PLAYBOOK[2].why = L("Además de razonar tiene que saber encadenar llamadas a herramientas sin perderse.", "Besides reasoning, it must chain tool calls without getting lost.");
+  ROLE_PLAYBOOK[3].what = L("Lee un cambio y busca fallos reales.", "Reads a change and hunts for real defects.");
+  ROLE_PLAYBOOK[3].why = L("Aquí sí compensa pagar: un fallo que se escapa cuesta mucho más que la diferencia de precio.", "Paying pays off here: a missed bug costs far more than the price gap.");
+  ROLE_PLAYBOOK[4].what = L("Investiga en la web y en el repositorio, y sintetiza.", "Researches the web and the repository, then synthesizes.");
+  ROLE_PLAYBOOK[4].why = L("Son muchas llamadas encadenadas: importa la fiabilidad siguiendo instrucciones con herramientas.", "Many chained calls: reliability following instructions with tools matters.");
+  ROLE_PLAYBOOK[5].what = L("Busca vulnerabilidades explotables.", "Hunts for exploitable vulnerabilities.");
+  ROLE_PLAYBOOK[5].why = L("El caso donde el razonamiento profundo pesa más que el precio. Mejor el modelo más capaz que tengas.", "The case where deep reasoning outweighs price. Use the most capable model you have.");
+}
+langRefreshers.push(refreshRolePlaybook);
+refreshRolePlaybook();
 
 function rolePlaybook(type) {
   for (var i = 0; i < ROLE_PLAYBOOK.length; i++) {
@@ -1315,10 +1306,10 @@ function rolePlaybook(type) {
   }
   return {
     type: type,
-    what: "Subagente personalizado.",
+    what: L("Subagente personalizado.", "Custom subagent."),
     keys: ["total"],
     weights: { capability: 0.6, cost: 0.3, speed: 0.1 },
-    why: "Sin perfil propio: se juzga por nota global, precio y velocidad."
+    why: L("Sin perfil propio: se juzga por nota global, precio y velocidad.", "No dedicated profile: judged by overall score, price, and speed.")
   };
 }
 
@@ -1424,17 +1415,17 @@ function modelPickedIds() {
  */
 function modelSelect(current, onChange) {
   var model = current ? findModel(current) : null;
-  var text = !current ? "(sin fijar)"
+  var text = !current ? L("(sin fijar)", "(not pinned)")
     : model ? model.label + "  ·  " + vendorOf(model)
-    : current + "  ·  (no está en el catálogo)";
+    : current + "  ·  " + L("(no está en el catálogo)", "(not in the catalog)");
   return el("button", {
     type: "button",
     className: "mpk" + (current ? "" : " mpk-empty"),
-    title: current ? current : "Elegir un modelo",
+    title: current ? current : L("Elegir un modelo", "Choose a model"),
     attrs: { "aria-haspopup": "dialog" },
     onclick: function () {
       openModelPicker({
-        title: "Elegir modelo",
+        title: L("Elegir modelo", "Choose model"),
         single: true,
         current: current,
         getList: function () { return [current]; },
@@ -1455,7 +1446,7 @@ function selectFrom(values, current, onChange) {
     if (value === current) { option.selected = true; found = true; }
     select.append(option);
   });
-  if (!found) select.prepend(el("option", { value: "", textContent: "(sin definir)", selected: true }));
+  if (!found) select.prepend(el("option", { value: "", textContent: L("(sin definir)", "(not defined)"), selected: true }));
   return select;
 }
 
@@ -1499,13 +1490,13 @@ function openModelPicker(opts) {
   });
   modal.append(el("div", { className: "fb-modal-head" }, [
     el("strong", { className: "fb-modal-title", textContent: opts.title }),
-    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar catálogo" }, onclick: detach })
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: L("Cerrar", "Close"), attrs: { "aria-label": L("Cerrar catálogo", "Close catalog") }, onclick: detach })
   ]));
   var count = el("span", { className: "fb-count" });
   var search = el("input", {
     type: "text",
-    placeholder: "Buscar por nombre, ID o fabricante…",
-    attrs: { "aria-label": "Buscar modelos" }
+    placeholder: L("Buscar por nombre, ID o fabricante…", "Search by name, ID, or vendor…"),
+    attrs: { "aria-label": L("Buscar modelos", "Search models") }
   });
   modal.append(el("div", { className: "fb-search" }, [search, count]));
 
@@ -1517,7 +1508,7 @@ function openModelPicker(opts) {
       if (on) r.row.classList.add("fb-on"); else r.row.classList.remove("fb-on");
       if (!single) {
         r.row.setAttribute("aria-pressed", on ? "true" : "false");
-        r.row.title = on ? "Quitar " + r.id + " del fallback" : "Añadir " + r.id + " al fallback";
+        r.row.title = on ? L("Quitar ", "Remove ") + r.id + L(" del fallback", " from the fallback") : L("Añadir ", "Add ") + r.id + L(" al fallback", " to the fallback");
       }
     });
   };
@@ -1533,7 +1524,7 @@ function openModelPicker(opts) {
   var addRow = function (model, g) {
     // El meta muestra fabricante y TIER de coste (no esfuerzo), nunca el
     // ID abreviado: va en su propia línea mono para poder verificarlo.
-    var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
+    var cost = model.tier === "byok" ? L("coste externo", "external cost") : L("coste ", "cost ") + (TIER_LABEL[model.tier] || "?");
     var mark = el("span", { className: "fb-mark", textContent: "" });
     var row = el("button", {
       type: "button",
@@ -1568,7 +1559,7 @@ function openModelPicker(opts) {
   allModels().forEach(function (m) { byId[m.id] = m; });
   var inPinned = {};
   if (pinnedIds.length) {
-    var pg = addGroup("Mis fijados");
+    var pg = addGroup(L("Mis fijados", "My pinned"));
     pinnedIds.forEach(function (id) {
       var m = byId[id];
       if (!m) return;
@@ -1578,7 +1569,7 @@ function openModelPicker(opts) {
     if (!pg._rows.length) modal.removeChild(pg);
   }
   catalog.forEach(function (group) {
-    var g = addGroup(group.label + (group.id === "copilot" ? "" : " (clave propia)"));
+    var g = addGroup(group.label + (group.id === "copilot" ? "" : L(" (clave propia)", " (own key)")));
     group.models.forEach(function (model) {
       if (inPinned[model.id]) return;
       addRow(model, g);
@@ -1586,7 +1577,7 @@ function openModelPicker(opts) {
     if (!g._rows.length) modal.removeChild(g);
   });
   groups = groups.filter(function (g) { return g.parentNode; });
-  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: "No hay modelos en el catálogo. Recarga con el botón «Actualizar modelos»." }));
+  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: L("No hay modelos en el catálogo. Recarga con el botón «Actualizar modelos».", "No models in the catalog. Reload with the «Update models» button.") }));
 
   var applyFilter = function () {
     var q = search.value.trim().toLowerCase();
@@ -1601,7 +1592,7 @@ function openModelPicker(opts) {
       if (any) g.classList.remove("fb-hide"); else g.classList.add("fb-hide");
     });
     count.textContent = rows.length
-      ? (shown === rows.length ? rows.length + (rows.length === 1 ? " modelo" : " modelos") : shown + " de " + rows.length)
+      ? (shown === rows.length ? rows.length + (rows.length === 1 ? L(" modelo", " model") : L(" modelos", " models")) : shown + L(" de ", " of ") + rows.length)
       : "";
   };
   search.oninput = applyFilter;
@@ -1610,7 +1601,7 @@ function openModelPicker(opts) {
     modal.append(el("div", { className: "fb-foot" }, [
       el("button", {
         type: "button", className: "toggle",
-        textContent: "Quitar el fijado (dejar sin modelo)",
+        textContent: L("Quitar el fijado (dejar sin modelo)", "Remove the pin (leave without a model)"),
         onclick: function () { opts.onPick(""); detach(); }
       })
     ]));
@@ -1643,9 +1634,9 @@ function fallbackChip(idx, total, id, onMove, onRemove) {
   return el("span", { className: "fb-chip", title: id }, [
     el("b", { className: "fb-pos", textContent: String(idx + 1) }),
     el("span", { className: "fb-name", textContent: name }),
-    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: "Subir en la cadena", attrs: { "aria-label": "Subir " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx - 1); } }) : null,
-    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: "Bajar en la cadena", attrs: { "aria-label": "Bajar " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx + 1); } }) : null,
-    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: "Quitar", attrs: { "aria-label": "Quitar " + name + " del fallback" }, onclick: onRemove })
+    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: L("Subir en la cadena", "Move up the chain"), attrs: { "aria-label": L("Subir ", "Move up ") + name + L(" en la cadena de fallback", " in the fallback chain") }, onclick: function () { onMove(idx, idx - 1); } }) : null,
+    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: L("Bajar en la cadena", "Move down the chain"), attrs: { "aria-label": L("Bajar ", "Move down ") + name + L(" en la cadena de fallback", " in the fallback chain") }, onclick: function () { onMove(idx, idx + 1); } }) : null,
+    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: L("Quitar", "Remove"), attrs: { "aria-label": L("Quitar ", "Remove ") + name + L(" del fallback", " from the fallback") }, onclick: onRemove })
   ]);
 }
 
@@ -1669,10 +1660,10 @@ function fallbackRow(labelWidth, host, getList, render, updater) {
   wrap.append(el("button", {
     type: "button",
     className: "fb-add",
-    textContent: list.length ? "+ añadir" : "+ elegir modelos",
-    title: "Abrir el catálogo para elegir modelos de fallback",
+    textContent: list.length ? L("+ añadir", "+ add") : L("+ elegir modelos", "+ choose models"),
+    title: L("Abrir el catálogo para elegir modelos de fallback", "Open the catalog to choose fallback models"),
     onclick: function () {
-      openFallbackPicker("Modelos de fallback", getList, function (id) {
+      openFallbackPicker(L("Modelos de fallback", "Fallback models"), getList, function (id) {
         updater(getList().concat([id]));
         render();
       }, function (id) {
@@ -1729,10 +1720,10 @@ function renderSubagents() {
   var agents = (state.subagents && state.subagents.agents) || {};
 
   var head = el("div", { className: "meter", style: { gridTemplateColumns: "150px minmax(0, 2.2fr) 92px 118px" } }, [
-    el("span", { className: "tiny muted", textContent: "Subagente" }),
-    el("span", { className: "tiny muted", textContent: "Modelo fijado" }),
-    el("span", { className: "tiny muted", textContent: "Esfuerzo" }),
-    el("span", { className: "tiny muted", textContent: "Exigencia" })
+    el("span", { className: "tiny muted", textContent: L("Subagente", "Subagent") }),
+    el("span", { className: "tiny muted", textContent: L("Modelo fijado", "Pinned model") }),
+    el("span", { className: "tiny muted", textContent: L("Esfuerzo", "Effort") }),
+    el("span", { className: "tiny muted", textContent: L("Exigencia", "Requirement") })
   ]);
   host.append(head);
 
@@ -1812,14 +1803,14 @@ function defs(hostId, entries) {
 
 function renderRoutingDefs() {
   defs("routingDefs", [
-    ["Modelo", "Qué modelo atiende ese papel. El botón abre un buscador sobre el catálogo: escribe nombre, ID o fabricante, y el grupo «Mis fijados» coloca delante los modelos que ya usas en otra fila. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
-    ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: " +
+    [L("Modelo", "Model"), L("Qué modelo atiende ese papel. El botón abre un buscador sobre el catálogo: escribe nombre, ID o fabricante, y el grupo «Mis fijados» coloca delante los modelos que ya usas en otra fila. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte.", "Which model serves that role. The button opens a search over the catalog: type a name, ID, or vendor, and the «My pinned» group surfaces the models you already use in another row. Copilot plan models consume your quota; own-key models are billed separately.")],
+    [L("Esfuerzo", "Effort") + " (effort)", L("Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: ", "How much compute time the model spends thinking before answering. Raising it improves hard problems and raises the cost of each call; lowering it answers sooner and spends less. The dropdown only offers the levels the chosen model supports; if you change models and the saved level is no longer valid, it is left undefined. Global levels: ") +
       effortLevels.join(" · ") + "."],
-    ["Fallback", "Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo con buscador (agrupado por proveedor, con «Mis fijados» delante): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden."],
-    ["Exigencia (modelPolicy) — required", "El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium."],
-    ["Exigencia (modelPolicy) — preferred", "El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla."],
-    ["Exigencia (modelPolicy) — inherit", "Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción."],
-    ["maxConcurrency", "Cuántos subagentes pueden ejecutarse a la vez. Más alto termina antes y dispara el gasto; más bajo es más barato y más lento."]
+    ["Fallback", L("Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo con buscador (agrupado por proveedor, con «Mis fijados» delante): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden.", "List of secondary models, in attempt order. Press «+ add» to open the searchable catalog (grouped by provider, with «My pinned» first): one click adds the model to the end of the chain and a ✓ marks those already present; ✕, ESC, or clicking the backdrop closes the modal. On the chips, the ↑↓ arrows change the order and ✕ removes. If the primary model is unavailable, the runtime tries the ones in this list in order.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy) — required", L("El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium.", "The pinned model is mandatory. If someone requests another model for that subagent, it is rejected. This is what stops a loose call from escalating to a premium model.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy) — preferred", L("El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla.", "The pinned model is only the default: an explicit request for another model wins. Use it when you want a suggestion, not a rule.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy) — inherit", L("Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción.", "No opinion of its own: whatever the runtime has configured applies. This is the value written when you choose this option.")],
+    ["maxConcurrency", L("Cuántos subagentes pueden ejecutarse a la vez. Más alto termina antes y dispara el gasto; más bajo es más barato y más lento.", "How many subagents can run at once. Higher finishes sooner and spikes spend; lower is cheaper and slower.")]
   ]);
 }
 
@@ -1830,28 +1821,28 @@ function renderCatalog() {
   var table = clear("catalogTable");
   var head = el("thead");
   head.append(el("tr", null, [
-    el("th", { textContent: "Modelo" }),
-    el("th", { textContent: "ID exacto de runtime" }),
-    el("th", { textContent: "Proveedor / ID runtime" }),
-    el("th", { textContent: "Fabricante" }),
-    el("th", { textContent: "Origen del dato", className: "tiny" }),
-    el("th", { textContent: "Precio" }),
-    el("th", { textContent: "Contexto" }),
-    el("th", { textContent: "Global", className: "num" })
+    el("th", { textContent: L("Modelo", "Model") }),
+    el("th", { textContent: L("ID exacto de runtime", "Exact runtime ID") }),
+    el("th", { textContent: L("Proveedor / ID runtime", "Provider / runtime ID") }),
+    el("th", { textContent: L("Fabricante", "Vendor") }),
+    el("th", { textContent: L("Origen del dato", "Data origin"), className: "tiny" }),
+    el("th", { textContent: L("Precio", "Price") }),
+    el("th", { textContent: L("Contexto", "Context") }),
+    el("th", { textContent: L("Global", "Global"), className: "num" })
   ]));
   table.append(head);
 
   var body = el("tbody");
   catalog.forEach(function (group) {
     body.append(el("tr", null, [
-      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + " modelos" })
+      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + L(" modelos", " models") })
     ]));
     group.models.forEach(function (model) {
       var origin = model.vendorSource === "runtime" ? "runtime"
         : model.vendorSource === "snapshot" ? "snapshot"
-        : model.vendorSource === "family" ? "inferido por familia"
-        : model.vendorSource === "heuristic" ? "inferido por nombre"
-        : "desconocido";
+        : model.vendorSource === "family" ? L("inferido por familia", "inferred from family")
+        : model.vendorSource === "heuristic" ? L("inferido por nombre", "inferred from name")
+        : L("desconocido", "unknown");
       body.append(el("tr", null, [
         el("td", { className: "small", textContent: model.label }),
         el("td", { className: "tiny mono", textContent: model.id }),
@@ -1872,29 +1863,29 @@ function renderCatalog() {
   var external = allModels().filter(function (model) { return model.external; }).length;
   var sourceIsLive = catalogSnapshot.source === "live";
   document.getElementById("catalogSub").textContent = sourceIsLive
-    ? allModels().length + " modelos en " + catalog.length + " proveedores (" + external +
-      " IDs cualificados por proveedor) reportados por el runtime de esta sesión. Que aparezcan aquí no verifica credenciales ni inferencia."
-    : "No hay lista de modelos en vivo; se muestra el catálogo de respaldo, que no puede confirmar disponibilidad.";
+    ? allModels().length + L(" modelos en ", " models across ") + catalog.length + L(" proveedores (", " providers (") + external +
+      L(" IDs cualificados por proveedor) reportados por el runtime de esta sesión. Que aparezcan aquí no verifica credenciales ni inferencia.", " provider-qualified IDs) reported by this session's runtime. Their presence here does not verify credentials or inference.")
+    : L("No hay lista de modelos en vivo; se muestra el catálogo de respaldo, que no puede confirmar disponibilidad.", "There is no live model list; the backup catalog is shown, which cannot confirm availability.");
 
   var withVendor = allModels().filter(function (model) { return model.vendor; }).length;
   document.getElementById("catalogMeta").textContent =
-    "Dato de fabricante identificado para " + withVendor + " de " + allModels().length + " modelos. " +
-    "Proviene del runtime o de la instantánea pública; no implica registro en proveedor ni que la llamada vaya a funcionar.";
+    L("Dato de fabricante identificado para ", "Vendor identified for ") + withVendor + L(" de ", " of ") + allModels().length + L(" modelos. ", " models. ") +
+    L("Proviene del runtime o de la instantánea pública; no implica registro en proveedor ni que la llamada vaya a funcionar.", "It comes from the runtime or the public snapshot; it does not imply provider registration or that the call will work.");
 }
 
 function renderCatalogDiagnostics() {
   var host = clear("catalogDiagnostics");
   var live = catalogSnapshot.source === "live";
   var knownIds = new Set(allModels().map(function (model) { return model.id; }));
-  var rows = [["Etapa / subagente", "ID de modelo configurado", "Exigencia", "Estado en el runtime"]];
+  var rows = [[L("Etapa / subagente", "Stage / subagent"), L("ID de modelo configurado", "Configured model ID"), L("Exigencia", "Requirement"), L("Estado en el runtime", "Runtime status")]];
   var statusFor = function (model) {
-    return !live ? "Desconocido — catálogo de respaldo"
-      : knownIds.has(model) ? "Listado por el runtime en vivo"
-      : "No lo expone esta sesión";
+    return !live ? L("Desconocido — catálogo de respaldo", "Unknown — backup catalog")
+      : knownIds.has(model) ? L("Listado por el runtime en vivo", "Listed by the live runtime")
+      : L("No lo expone esta sesión", "Not exposed by this session");
   };
   ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
     var model = state.roles && state.roles[role] && state.roles[role].model || "";
-    rows.push([role, model || "(sin configurar)", "—", statusFor(model)]);
+    rows.push([role, model || L("(sin configurar)", "(not configured)"), "—", statusFor(model)]);
   });
   // A subagent pin is the one enforced with modelPolicy=required, so an id the
   // runtime cannot resolve silently routes elsewhere; the rows make that visible.
@@ -1902,23 +1893,23 @@ function renderCatalogDiagnostics() {
   Object.keys(pinnedAgents).forEach(function (type) {
     var entry = pinnedAgents[type] || {};
     if (!entry.model) return;
-    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || "(predeterminada)", statusFor(entry.model)]);
+    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || L("(predeterminada)", "(default)"), statusFor(entry.model)]);
   });
   var sourceText = live
-    ? "Fuente: session.rpc.model.list() — runtime de la sesión en vivo"
-    : "Fuente: catálogo de respaldo — no se pudo confirmar disponibilidad en vivo";
+    ? L("Fuente: session.rpc.model.list() — runtime de la sesión en vivo", "Source: session.rpc.model.list() — this session's live runtime")
+    : L("Fuente: catálogo de respaldo — no se pudo confirmar disponibilidad en vivo", "Source: backup catalog — live availability could not be confirmed");
   var checkedText = catalogDiagnostics.fetchedAt
-    ? "Última comprobación: " + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
-    : "Última comprobación: desconocida";
+    ? L("Última comprobación: ", "Last checked: ") + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
+    : L("Última comprobación: desconocida", "Last checked: unknown");
   host.append(el("p", { className: "note", textContent: sourceText + ". " + checkedText +
-    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + " modelos en " +
-    (catalogDiagnostics.providers || []).length + " proveedores." }));
+    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + L(" modelos en ", " models across ") +
+    (catalogDiagnostics.providers || []).length + L(" proveedores.", " providers.") }));
   if (!live) {
     host.append(el("p", { className: "note", textContent:
-      catalogSnapshot.diagnostic || "La petición de modelos en vivo falló o no devolvió modelos; consulta el registro de la extensión para más detalle. El catálogo de respaldo es solo informativo y no puede confirmar disponibilidad." }));
+      catalogSnapshot.diagnostic || L("La petición de modelos en vivo falló o no devolvió modelos; consulta el registro de la extensión para más detalle. El catálogo de respaldo es solo informativo y no puede confirmar disponibilidad.", "The live model request failed or returned no models; check the extension log for more detail. The backup catalog is informational only and cannot confirm availability.") }));
   }
   host.append(el("p", { className: "note", textContent:
-    "«Listado por el runtime en vivo» significa que la sesión actual reporta ese ID exacto; no verifica credenciales del proveedor ni una petición de inferencia con éxito. «No lo expone esta sesión» no significa que el modelo falte en los ajustes de la app ni en el registro de un proveedor." }));
+    L("«Listado por el runtime en vivo» significa que la sesión actual reporta ese ID exacto; no verifica credenciales del proveedor ni una petición de inferencia con éxito. «No lo expone esta sesión» no significa que el modelo falte en los ajustes de la app ni en el registro de un proveedor.", "«Listed by the live runtime» means the current session reports that exact ID; it does not verify provider credentials or a successful inference request. «Not exposed by this session» does not mean the model is missing from the app's settings or from a provider's registry.") }));
   var table = el("table");
   var head = el("thead");
   head.append(el("tr", null, rows[0].map(function (text) { return el("th", { textContent: text }); })));
@@ -1965,18 +1956,18 @@ function renderCatalogDiagnostics() {
     var inputRow = el("div", { className: "filters-row", style: { marginBottom: "10px" } });
     var idInput = el("input", {
       type: "text",
-      placeholder: "ID del proveedor (ej. c086cdfb-... o el hostname)",
+      placeholder: L("ID del proveedor (ej. c086cdfb-... o el hostname)", "Provider ID (e.g. c086cdfb-... or the hostname)"),
       style: { flex: "1 1 280px", fontSize: "12px", padding: "4px 8px", border: "1px solid var(--border-color-default, #d1d9e0)", borderRadius: "6px" }
     });
     var labelInput = el("input", {
       type: "text",
-      placeholder: "Nombre legible (ej. Mi proveedor externo)",
+      placeholder: L("Nombre legible (ej. Mi proveedor externo)", "Readable name (e.g. My external provider)"),
       style: { flex: "1 1 200px", fontSize: "12px", padding: "4px 8px", border: "1px solid var(--border-color-default, #d1d9e0)", borderRadius: "6px" }
     });
     var addBtn = el("button", {
       className: "toggle",
       type: "button",
-      textContent: "Agregar",
+      textContent: L("Agregar", "Add"),
       style: { fontSize: "11px", padding: "3px 12px" },
       onclick: function () {
         var pid = idInput.value.trim();
@@ -2028,18 +2019,35 @@ function renderCatalogDiagnostics() {
 
   function renderCatalogDefs() {
   defs("catalogDefs", [
-    ["Estado en el runtime", "Solo se marca como listado un ID de modelo exacto presente en una lista de modelos en vivo de la sesión con éxito. No es una prueba de credenciales, endpoint ni inferencia."],
-    ["Catálogo de respaldo", "Lista solo informativa que se usa cuando la lista de modelos de la sesión no está disponible. Nunca confirma que un modelo del flujo de trabajo esté disponible."],
-    ["Proveedor", "Quién sirve el modelo. GitHub Copilot, o el proveedor externo cuya clave tengas configurada."],
-    ["Fabricante", "Quién lo construyó. Se muestra aparte del proveedor porque un mismo fabricante puede llegar por varias vías."],
-    ["Origen del dato", "De dónde ha salido el fabricante: del runtime, de la instantánea pública, de la familia del modelo o de una heurística sobre el identificador."],
-    ["Precio", "Categoría de precio del plan en los modelos de Copilot; en los de clave propia, el precio de API que publica el fabricante."],
-    ["Contexto", "Cuántos tokens caben en una sola conversación. Más contexto permite analizar proyectos enteros, y también encarece cada llamada."],
-    ["Global", "Nota media de los benchmarks públicos. Un guion significa que ese modelo todavía no aparece en ninguno."]
+    [L("Estado en el runtime", "Runtime status"), L("Solo se marca como listado un ID de modelo exacto presente en una lista de modelos en vivo de la sesión con éxito. No es una prueba de credenciales, endpoint ni inferencia.", "Only an exact model ID present in a successful live model list for the session is marked as listed. It is not proof of credentials, endpoint, or inference.")],
+    [L("Catálogo de respaldo", "Backup catalog"), L("Lista solo informativa que se usa cuando la lista de modelos de la sesión no está disponible. Nunca confirma que un modelo del flujo de trabajo esté disponible.", "An informational-only list used when the session's model list is unavailable. It never confirms that a workflow model is available.")],
+    [L("Proveedor", "Provider"), L("Quién sirve el modelo. GitHub Copilot, o el proveedor externo cuya clave tengas configurada.", "Who serves the model. GitHub Copilot, or the external provider whose key you have configured.")],
+    [L("Fabricante", "Vendor"), L("Quién lo construyó. Se muestra aparte del proveedor porque un mismo fabricante puede llegar por varias vías.", "Who built it. It is shown separately from the provider because the same vendor can arrive through several channels.")],
+    [L("Origen del dato", "Data origin"), L("De dónde ha salido el fabricante: del runtime, de la instantánea pública, de la familia del modelo o de una heurística sobre el identificador.", "Where the vendor came from: the runtime, the public snapshot, the model family, or a heuristic over the identifier.")],
+    [L("Precio", "Price"), L("Categoría de precio del plan en los modelos de Copilot; en los de clave propia, el precio de API que publica el fabricante.", "Plan price category for Copilot models; for own-key models, the API price the vendor publishes.")],
+    [L("Contexto", "Context"), L("Cuántos tokens caben en una sola conversación. Más contexto permite analizar proyectos enteros, y también encarece cada llamada.", "How many tokens fit in a single conversation. More context lets you analyze whole projects, and also raises the cost of each call.")],
+    [L("Global", "Global"), L("Nota media de los benchmarks públicos. Un guion significa que ese modelo todavía no aparece en ninguno.", "Average score across public benchmarks. A dash means that model does not yet appear in any.")]
   ]);
 }
 
 // --- benchmarks tab ---------------------------------------------------------
+
+function refreshCategoryLabels() {
+  CAPABILITIES.total = L("Nota global", "Overall score");
+  CAPABILITIES.reasoning = L("Razonamiento", "Reasoning");
+  CAPABILITIES.coding = L("Código", "Coding");
+  CAPABILITIES.agent = L("Agente y herramientas", "Agent and tools");
+  CAPABILITIES.tau = L("Diálogo con herramientas (τ-bench)", "Tool dialogue (τ-bench)");
+  CAPABILITIES.terminal = L("Terminal", "Terminal");
+  CAPABILITIES.liveCodeBench = L("Código en vivo", "Live code");
+  CAPABILITIES.education = L("Educación", "Education");
+  CAPABILITIES.medical = L("Medicina", "Medicine");
+  CAPABILITIES.finance = L("Finanzas", "Finance");
+  CAPABILITIES.law = L("Legal", "Legal");
+  CAPABILITIES.language = L("Idioma", "Language");
+}
+refreshCategoryLabels();
+langRefreshers.push(refreshCategoryLabels);
 
 function bar(value, max) {
   var pct = Math.max(0, Math.min(100, (value / (max || 100)) * 100));
@@ -2069,22 +2077,22 @@ function renderRecommendations() {
       el("p", { className: "what", textContent: playbook.what }),
       el("div", { className: "pick" }, [
         el("span", { className: "who", textContent: best.model.label }),
-        el("span", { className: "score " + (best.score >= 75 ? "tone-good" : best.score >= 50 ? "tone-mid" : "tone-bad"), textContent: num(best.score, 0) + " / 100 de encaje" })
+        el("span", { className: "score " + (best.score >= 75 ? "tone-good" : best.score >= 50 ? "tone-mid" : "tone-bad"), textContent: num(best.score, 0) + L(" / 100 de encaje", " / 100 fit") })
       ]),
       bar(best.score, 100),
       el("p", { className: "tiny muted", style: { margin: "6px 0 8px" },
-        textContent: vendorOf(best.model) + " · " + (best.capabilityRaw === null ? "sin benchmark público" : "calidad media " + num(best.capabilityRaw) + " en " + playbook.keys.join(" + ")) +
-          " · " + (best.model.external ? money(best.model.blendedCost) + "/1M" : "categoría " + (TIER_LABEL[best.model.tier] || "?")) })
+        textContent: vendorOf(best.model) + " · " + (best.capabilityRaw === null ? L("sin benchmark público", "no public benchmark") : L("calidad media ", "median quality ") + num(best.capabilityRaw) + L(" en ", " on ") + playbook.keys.join(" + ")) +
+          " · " + (best.model.external ? money(best.model.blendedCost) + "/1M" : L("categoría ", "category ") + (TIER_LABEL[best.model.tier] || "?")) })
     ]);
 
     if (best.estimated) {
       card.append(el("p", { className: "tiny warn-line", style: { margin: "0 0 8px" },
-        textContent: "Sin datos públicos de calidad para este modelo: la puntuación sale de precio y velocidad, así que trátala como una apuesta, no como una medida." }));
+        textContent: L("Sin datos públicos de calidad para este modelo: la puntuación sale de precio y velocidad, así que trátala como una apuesta, no como una medida.", "No public quality data for this model: the score comes from price and speed, so treat it as a bet, not a measurement.") }));
     }
 
     var others = ranked.slice(1, 4).map(function (row) {
       return el("div", { className: "meter", style: { gridTemplateColumns: "1fr 90px 34px" } }, [
-        el("span", { className: "small", textContent: row.model.label + (row.estimated ? " (sin datos)" : "") }),
+        el("span", { className: "small", textContent: row.model.label + (row.estimated ? L(" (sin datos)", " (no data)") : "") }),
         bar(row.score, 100),
         el("span", { className: "val", textContent: num(row.score, 0) })
       ]);
@@ -2094,15 +2102,15 @@ function renderRecommendations() {
     card.append(el("p", { className: "tiny muted", style: { margin: "8px 0 10px" }, textContent: playbook.why }));
 
     var pinLine = el("div", { className: "small" }, [
-      el("span", { className: "muted", textContent: "Fijado ahora: " }),
-      el("span", { className: "mono", textContent: pinned || "(sin definir)" })
+      el("span", { className: "muted", textContent: L("Fijado ahora: ", "Pinned now: ") }),
+      el("span", { className: "mono", textContent: pinned || L("(sin definir)", "(not set)") })
     ]);
     if (pinnedEffort) pinLine.append(el("span", { className: "mono", textContent: " · " + pinnedEffort }));
     if (pinnedModel && !pinnedModel.external && !best.model.external && typeof pinnedModel.blendedCost === "number" && typeof best.model.blendedCost === "number" && best.model.blendedCost > 0) {
       var factor = pinnedModel.blendedCost / best.model.blendedCost;
       if (factor >= 1.6) {
         card.append(el("p", { className: "tiny", style: { margin: "4px 0 0" },
-          textContent: "Ojo: el modelo que tienes fijado cuesta unas " + factor.toFixed(1) + " veces más por token que el recomendado." }));
+          textContent: L("Ojo: el modelo que tienes fijado cuesta unas ", "Note: the model you have pinned costs about ") + factor.toFixed(1) + L(" veces más por token que el recomendado.", " times more per token than the recommended one.") }));
       }
     }
     card.append(pinLine);
@@ -2110,7 +2118,7 @@ function renderRecommendations() {
     // Effort travels with the pin: the recommended model is only half the
     // decision, and the same levels as the routing tab apply here.
     var effortRow = el("div", { className: "small", style: { display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" } }, [
-      el("span", { className: "muted", textContent: "Esfuerzo:" })
+      el("span", { className: "muted", textContent: L("Esfuerzo:", "Effort:") })
     ]);
     effortRow.append(selectFrom(bestEfforts, chosenEffort, function (value) {
       chosenEffort = value;
@@ -2123,12 +2131,12 @@ function renderRecommendations() {
       actions.replaceChildren();
       if (matches && chosenEffort === pinnedEffort) {
         actions.append(el("p", { className: "tiny", style: { margin: "8px 0 0" },
-          textContent: pinnedEffort ? "Ya coincide: modelo y esfuerzo fijados." : "Ya coincide con la recomendación." }));
+          textContent: pinnedEffort ? L("Ya coincide: modelo y esfuerzo fijados.", "Already matches: model and effort pinned.") : L("Ya coincide con la recomendación.", "Already matches the recommendation.") }));
         return;
       }
       actions.append(el("button", {
         className: "mini primary", style: { marginTop: "8px" },
-        textContent: "Fijar " + best.model.label + (chosenEffort ? " · " + chosenEffort : ""),
+        textContent: L("Fijar ", "Pin ") + best.model.label + (chosenEffort ? " · " + chosenEffort : ""),
         onclick: function () {
           var next = Object.assign({}, agents[playbook.type] || {}, { model: best.model.id });
           if (chosenEffort) next.effortLevel = chosenEffort; else delete next.effortLevel;
@@ -2156,25 +2164,25 @@ function renderProfile() {
     fromBench = !!model;
   }
   if (!model) {
-    document.getElementById("profileSub").textContent = "Haz clic en cualquier fila de la tabla de abajo para ver su perfil.";
-    host.append(el("p", { className: "small muted", textContent: "Sin modelo seleccionado." }));
+    document.getElementById("profileSub").textContent = L("Haz clic en cualquier fila de la tabla de abajo para ver su perfil.", "Click any row in the table below to see its profile.");
+    host.append(el("p", { className: "small muted", textContent: L("Sin modelo seleccionado.", "No model selected.") }));
     return;
   }
 
   document.getElementById("profileSub").textContent = model.label + " — " + vendorOf(model) +
-    (fromBench ? " (solo en el ranking público; no está en tu catálogo)"
-      : model.external ? " (clave propia)" : " (plan de Copilot)");
+    (fromBench ? L(" (solo en el ranking público; no está en tu catálogo)", " (public leaderboard only; not in your catalog)")
+      : model.external ? L(" (clave propia)", " (own API key)") : L(" (plan de Copilot)", " (Copilot plan)"));
 
   var keys = Object.keys(model.bench || {});
   if (!keys.length) {
     host.append(el("p", { className: "small muted", textContent:
-      "Este modelo todavía no tiene notas públicas de benchmark: ninguna fuente de la instantánea lo mide a él ni a ninguna variante de su familia. " +
-      "Las fuentes van por detrás de los lanzamientos; en cuanto midan el modelo o un hermano de la misma familia, aparecerá aquí (los marcados con ~ son estimaciones por familia)." }));
+      L("Este modelo todavía no tiene notas públicas de benchmark: ninguna fuente de la instantánea lo mide a él ni a ninguna variante de su familia. ", "This model has no public benchmark notes yet: no source in the snapshot measures it or any variant of its family. ") +
+      L("Las fuentes van por detrás de los lanzamientos; en cuanto midan el modelo o un hermano de la misma familia, aparecerá aquí (los marcados con ~ son estimaciones por familia).", "Sources trail releases; once the model or a sibling in the same family is measured, it will appear here (those marked ~ are family estimates).") }));
   } else {
     if (model.benchEstimated) {
       host.append(el("p", { className: "small warn-line", style: { marginTop: "0" },
-        textContent: "~ " + (model.benchNote || "Nota estimada a partir de variantes de la misma familia") +
-          ". Es una estimación, no una medida directa del benchmark." }));
+        textContent: "~ " + (model.benchNote || L("Nota estimada a partir de variantes de la misma familia", "Note estimated from variants of the same family")) +
+          L(". Es una estimación, no una medida directa del benchmark.", ". This is an estimate, not a direct benchmark measurement.") }));
     }
     keys.forEach(function (key) {
       var value = model.bench[key];
@@ -2187,22 +2195,22 @@ function renderProfile() {
     });
     if (model.effortOptions && model.effortOptions.length > 1) {
       host.append(el("p", { className: "tiny muted", style: { marginTop: "6px" },
-        textContent: "Las notas no desglosan por nivel de esfuerzo: cambiar el esfuerzo altera la calidad, latencia y coste reales de cada uso, pero la fuente mide el modelo una sola vez." }));
+        textContent: L("Las notas no desglosan por nivel de esfuerzo: cambiar el esfuerzo altera la calidad, latencia y coste reales de cada uso, pero la fuente mide el modelo una sola vez.", "The notes are not broken down by effort level: changing effort alters the real quality, latency and cost of each use, but the source measures the model only once.") }));
     }
   }
 
   var facts = [
-    ["Fabricante", vendorOf(model)],
-    ["Familia", model.family || "—"],
-    ["Precio de referencia", typeof model.blendedCost === "number" ? money(model.blendedCost) + " por 1M de tokens" : "—"],
-    ["Entrada / salida", model.cost ? money(model.cost.input) + " / " + money(model.cost.output) : "—"],
-    ["Contexto", contextLabel(model.context) + " tokens"],
-    ["Velocidad", model.speed && typeof model.speed.outputTps === "number" ? num(model.speed.outputTps, 0) + " tokens/s" : "—"],
-    ["Primer token", typeof model.latencyS === "number" ? num(model.latencyS, 2) + " s" : (model.speed && typeof model.speed.ttftMs === "number" ? num(model.speed.ttftMs / 1000, 2) + " s" : "—")],
-    ["Razonamiento", model.reasoning === true ? "sí" : model.reasoning === false ? "no" : "—"],
-    ["Esfuerzos admitidos", model.effortOptions && model.effortOptions.length ? model.effortOptions.join(" · ") : "—"],
-    ["Pesos abiertos", model.openWeights === true ? "sí" : model.openWeights === false ? "no" : "—"],
-    ["Publicado", model.releaseDate || "—"]
+    [L("Fabricante", "Vendor"), vendorOf(model)],
+    [L("Familia", "Family"), model.family || "—"],
+    [L("Precio de referencia", "Reference price"), typeof model.blendedCost === "number" ? money(model.blendedCost) + L(" por 1M de tokens", " per 1M tokens") : "—"],
+    [L("Entrada / salida", "Input / output"), model.cost ? money(model.cost.input) + " / " + money(model.cost.output) : "—"],
+    [L("Contexto", "Context"), contextLabel(model.context) + " tokens"],
+    [L("Velocidad", "Speed"), model.speed && typeof model.speed.outputTps === "number" ? num(model.speed.outputTps, 0) + " tokens/s" : "—"],
+    [L("Primer token", "First token"), typeof model.latencyS === "number" ? num(model.latencyS, 2) + " s" : (model.speed && typeof model.speed.ttftMs === "number" ? num(model.speed.ttftMs / 1000, 2) + " s" : "—")],
+    [L("Razonamiento", "Reasoning"), model.reasoning === true ? L("sí", "yes") : model.reasoning === false ? L("no", "no") : "—"],
+    [L("Esfuerzos admitidos", "Supported efforts"), model.effortOptions && model.effortOptions.length ? model.effortOptions.join(" · ") : "—"],
+    [L("Pesos abiertos", "Open weights"), model.openWeights === true ? L("sí", "yes") : model.openWeights === false ? L("no", "no") : "—"],
+    [L("Publicado", "Released"), model.releaseDate || "—"]
   ];
   var list = el("dl", { className: "defs", style: { marginTop: "14px" } });
   facts.forEach(function (pair) {
@@ -2213,7 +2221,7 @@ function renderProfile() {
 
   if (model.rank && typeof model.rank.total === "number") {
     host.append(el("p", { className: "small muted", style: { marginTop: "10px" },
-      textContent: "Posición " + model.rank.total + " en la clasificación global de la instantánea." }));
+      textContent: L("Posición ", "Rank ") + model.rank.total + L(" en la clasificación global de la instantánea.", " in the snapshot global ranking.") }));
   }
 }
 
@@ -2228,7 +2236,7 @@ function renderScatter() {
   var legend = clear("scatterLegend");
   var points = scatterPoints();
   if (points.length < 2) {
-    host.append(el("p", { className: "small muted", textContent: "No hay suficientes modelos con precio y nota a la vez." }));
+    host.append(el("p", { className: "small muted", textContent: L("No hay suficientes modelos con precio y nota a la vez.", "Not enough models have both a price and a score.") }));
     return;
   }
 
@@ -2258,8 +2266,8 @@ function renderScatter() {
     root.append(svgText("text", { x: P.l - 6, y: yPos + 3, "font-size": 10, "text-anchor": "end", fill: "currentColor", "fill-opacity": 0.6 }, String(y)));
   }
 
-  root.append(svgText("text", { x: P.l + (W - P.l - P.r) / 2, y: H - 4, "font-size": 11, "text-anchor": "middle", fill: "currentColor", "fill-opacity": 0.7 }, "Precio de referencia por 1M de tokens (escala logarítmica)"));
-  root.append(svgText("text", { x: 12, y: P.t + (H - P.t - P.b) / 2, "font-size": 11, "text-anchor": "middle", fill: "currentColor", "fill-opacity": 0.7, transform: "rotate(-90 12 " + (P.t + (H - P.t - P.b) / 2) + ")" }, "Nota global"));
+  root.append(svgText("text", { x: P.l + (W - P.l - P.r) / 2, y: H - 4, "font-size": 11, "text-anchor": "middle", fill: "currentColor", "fill-opacity": 0.7 }, L("Precio de referencia por 1M de tokens (escala logarítmica)", "Reference price per 1M tokens (log scale)")));
+  root.append(svgText("text", { x: 12, y: P.t + (H - P.t - P.b) / 2, "font-size": 11, "text-anchor": "middle", fill: "currentColor", "fill-opacity": 0.7, transform: "rotate(-90 12 " + (P.t + (H - P.t - P.b) / 2) + ")" }, L("Nota global", "Overall score")));
 
   var vendors = {};
   points.forEach(function (model) {
@@ -2272,7 +2280,7 @@ function renderScatter() {
       fill: vendorColor(vendor), "fill-opacity": 0.85,
       stroke: model.external ? "currentColor" : "none", "stroke-width": model.external ? 1.5 : 0
     });
-    dot.append(svgText("title", null, model.label + " — " + vendor + "\n" + money(model.blendedCost) + "/1M · global " + num(model.bench.total)));
+    dot.append(svgText("title", null, model.label + " — " + vendor + "\n" + money(model.blendedCost) + "/1M · " + L("global ", "overall ") + num(model.bench.total)));
     dot.style.cursor = "pointer";
     dot.addEventListener("click", function () { selectedId = model.id; renderProfile(); });
     root.append(dot);
@@ -2333,15 +2341,15 @@ function benchValue(row, key) {
 function renderBenchTable() {
   var table = clear("benchTable");
   var columns = [
-    ["label", "Modelo", "text"],
-    ["vendor", "Fabricante", "text"],
-    ["total", "Global", "num"],
-    ["coding", "Código", "num"],
-    ["agent", "Agente", "num"],
-    ["reasoning", "Razon.", "num"],
+    ["label", L("Modelo", "Model"), "text"],
+    ["vendor", L("Fabricante", "Vendor"), "text"],
+    ["total", L("Global", "Overall"), "num"],
+    ["coding", L("Código", "Coding"), "num"],
+    ["agent", L("Agente", "Agent"), "num"],
+    ["reasoning", L("Razon.", "Reason."), "num"],
     ["tau", "τ-bench", "num"],
-    ["terminal", "Terminal", "num"],
-    ["cost", "Precio", "num"],
+    ["terminal", L("Terminal", "Terminal"), "num"],
+    ["cost", L("Precio", "Price"), "num"],
     ["speed", "Tok/s", "num"]
   ];
 
@@ -2398,7 +2406,7 @@ function renderBenchTable() {
         cell.append(el("span", {
           className: "est",
           textContent: " ~",
-          title: row.note || "Nota estimada a partir de variantes de la misma familia"
+          title: row.note || L("Nota estimada a partir de variantes de la misma familia", "Note estimated from variants of the same family")
         }));
       }
       if (column[0] === "vendor" && row.vendor) {
@@ -2417,36 +2425,36 @@ function renderBenchTable() {
       el("td", {
         colSpan: columns.length,
         textContent: onlyMine
-          ? "Ninguno de los modelos que puedes elegir tiene notas públicas ni una estimación por familia. Desactiva el botón de arriba para ver los " + scored.length + " modelos que sí están medidos, aunque no puedas escogerlos."
-          : "Ninguno de los modelos filtrados tiene notas de benchmarks públicos todavía."
+          ? L("Ninguno de los modelos que puedes elegir tiene notas públicas ni una estimación por familia. Desactiva el botón de arriba para ver los ", "None of the models you can choose has public notes or a family estimate. Turn off the button above to see the ") + scored.length + L(" modelos que sí están medidos, aunque no puedas escogerlos.", " models that are measured, even if you cannot pick them.")
+          : L("Ninguno de los modelos filtrados tiene notas de benchmarks públicos todavía.", "None of the filtered models has public benchmark notes yet.")
       })
     ]));
   }
   table.append(body);
 
-  var sub = rows.length + " de " + scored.length + " modelos con notas" +
-    (onlyMine ? " · solo los que puedes elegir" : " · todo el campo público") +
-    (limit ? " · filtrados" : "") + ".";
-  if (!onlyMine) sub += " Las highlighted rows are model IDs listed by this session's live model RPC; this does not verify provider credentials or successful inference.";
-  if (estimatedShown) sub += " Los marcados con ~ son estimaciones por familia, no medidas directas.";
+  var sub = rows.length + L(" de ", " of ") + scored.length + L(" modelos con notas", " models with notes") +
+    (onlyMine ? L(" · solo los que puedes elegir", " · only the ones you can choose") : L(" · todo el campo público", " · the whole public field")) +
+    (limit ? L(" · filtrados", " · filtered") : "") + ".";
+  if (!onlyMine) sub += L(" Las filas resaltadas son IDs de modelo listados por el RPC de modelos en vivo de esta sesión; esto no verifica credenciales del proveedor ni una inferencia con éxito.", " Highlighted rows are model IDs listed by this session's live model RPC; this does not verify provider credentials or successful inference.");
+  if (estimatedShown) sub += L(" Los marcados con ~ son estimaciones por familia, no medidas directas.", " Those marked with ~ are family estimates, not direct measurements.");
   document.getElementById("benchSub").textContent = sub;
 }
 
 function renderBenchMeta() {
   var parts = [];
-  if (benchMeta && benchMeta.generatedAt) parts.push("Instantánea generada el " + benchMeta.generatedAt.slice(0, 10) + ".");
-  if (benchSource === "downloaded") parts.push("Descargada del repositorio público.");
-  else if (benchSource === "bundled") parts.push("Usando la copia incluida con la extensión.");
-  else parts.push("Sin datos: no se pudo leer ninguna instantánea.");
+  if (benchMeta && benchMeta.generatedAt) parts.push(L("Instantánea generada el ", "Snapshot generated on ") + benchMeta.generatedAt.slice(0, 10) + ".");
+  if (benchSource === "downloaded") parts.push(L("Descargada del repositorio público.", "Downloaded from the public repository."));
+  else if (benchSource === "bundled") parts.push(L("Usando la copia incluida con la extensión.", "Using the copy bundled with the extension."));
+  else parts.push(L("Sin datos: no se pudo leer ninguna instantánea.", "No data: no snapshot could be read."));
   if (benchMeta && benchMeta.counts) {
-    parts.push(benchMeta.counts.models + " modelos, " + benchMeta.counts.withBenchmarks + " con benchmark, " + benchMeta.counts.withVendor + " con fabricante.");
+    parts.push(benchMeta.counts.models + L(" modelos, ", " models, ") + benchMeta.counts.withBenchmarks + L(" con benchmark, ", " with benchmarks, ") + benchMeta.counts.withVendor + L(" con fabricante.", " with vendor."));
   }
   if (benchMeta && benchMeta.sources && benchMeta.sources.length) {
-    parts.push("Fuentes: " + benchMeta.sources.map(function (source) {
+    parts.push(L("Fuentes: ", "Sources: ") + benchMeta.sources.map(function (source) {
       return typeof source === "string" ? source : (source.id || source.url || "?");
     }).join(", ") + ".");
   }
-  if (repoUrl) parts.push("Origen: " + repoUrl);
+  if (repoUrl) parts.push(L("Origen: ", "Source: ") + repoUrl);
   document.getElementById("benchMeta").textContent = parts.join(" ");
 }
 
@@ -2514,8 +2522,8 @@ function buildScene(THREE) {
       className: "small muted",
       style: { padding: "16px" },
       textContent: onlyMine
-        ? "Ninguno de los modelos que puedes elegir tiene nota global ni una estimación por familia. Quita el botón Solo mis modelos para ver todo el campo público."
-        : "Ninguna esfera pasa los filtros del mapa 3D. Prueba a activar las esferas sin precio, las estimadas o a soltar el filtro de fabricante."
+        ? L("Ninguno de los modelos que puedes elegir tiene nota global ni una estimación por familia. Quita el botón Solo mis modelos para ver todo el campo público.", "None of the models you can choose has an overall score or a family estimate. Turn off the Only my models button to see the whole public field.")
+        : L("Ninguna esfera pasa los filtros del mapa 3D. Prueba a activar las esferas sin precio, las estimadas o a soltar el filtro de fabricante.", "No sphere passes the 3D map filters. Try enabling unpriced or estimated spheres, or clearing the vendor filter.")
     }));
     return null;
   }
@@ -2618,9 +2626,9 @@ function buildScene(THREE) {
   var radius = sphereSize * 1.15;
 
   var AXIS = {
-    x: { hex: 0xf0a000, css: "#a86a00", title: "Precio (log) →" },
-    y: { hex: 0x1a9c4a, css: "#157f3c", title: "↑ Nota global" },
-    z: { hex: 0x2f7ae5, css: "#2461b8", title: "Velocidad (tok/s) →" }
+    x: { hex: 0xf0a000, css: "#a86a00", title: L("Precio (log) →", "Price (log) →") },
+    y: { hex: 0x1a9c4a, css: "#157f3c", title: L("↑ Nota global", "↑ Overall score") },
+    z: { hex: 0x2f7ae5, css: "#2461b8", title: L("Velocidad (tok/s) →", "Speed (tok/s) →") }
   };
   var LABEL_H = sphereSize * 0.052;
   var LABEL_FONT = "600 44px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -2738,7 +2746,7 @@ function buildScene(THREE) {
     laneLine.material.depthWrite = false;
     frame.add(laneLine);
 
-    var laneLabel = makeLabel("sin precio público", "#59636e", LABEL_H * 1.05);
+    var laneLabel = makeLabel(L("sin precio público", "no public price"), "#59636e", LABEL_H * 1.05);
     laneLabel.position.set(laneX, laneBottom - LABEL_H, laneZ);
     frame.add(laneLabel);
   }
@@ -2789,7 +2797,7 @@ function buildScene(THREE) {
       tip.style.left = Math.min(event.clientX - rect.left + 12, rect.width - 250) + "px";
       tip.style.top = Math.max(event.clientY - rect.top - 8, 4) + "px";
       tip.textContent = point.label + " — " + point.vendor +
-        " · global " + point.total.toFixed(1) +
+        " · " + L("global ", "overall ") + point.total.toFixed(1) +
         (point.cost === null ? "" : " · " + money(point.cost) + "/1M") +
         (point.speed === null ? "" : " · " + Math.round(point.speed) + " tok/s");
     } else {
@@ -2842,12 +2850,12 @@ function buildScene(THREE) {
   var dimmed = points.filter(function (point) { return point.dim; }).length;
   var status = document.getElementById("sceneStatus");
   if (status) {
-    status.textContent = points.length + " esferas" +
-      (onlyMine ? " (solo las que puedes elegir)" : " (todo el campo público)") +
-      " · " + highlighted + " con halo" +
-      (dimmed ? " · " + dimmed + " atenuadas por el filtro de arriba" : "") +
-      (sceneVendors ? " · " + Object.keys(sceneVendors).length + " fabricante(s)" : "") +
-      (unpricedCount ? " · " + unpricedCount + " sin precio público (huecas, en su carril)" : "");
+    status.textContent = points.length + L(" esferas", " spheres") +
+      (onlyMine ? L(" (solo las que puedes elegir)", " (only the ones you can choose)") : L(" (todo el campo público)", " (the whole public field)")) +
+      " · " + highlighted + L(" con halo", " with halo") +
+      (dimmed ? " · " + dimmed + L(" atenuadas por el filtro de arriba", " dimmed by the filter above") : "") +
+      (sceneVendors ? " · " + Object.keys(sceneVendors).length + L(" fabricante(s)", " vendor(s)") : "") +
+      (unpricedCount ? " · " + unpricedCount + L(" sin precio público (huecas, en su carril)", " with no public price (hollow, in their lane)") : "");
   }
 
   updateCamera();
@@ -2886,12 +2894,12 @@ async function ensureScene() {
     sceneSignature = signature;
     if (!three) {
       sceneFailedFor = signature;
-      sceneMessage("No hay datos de benchmark suficientes para dibujar el mapa.");
+      sceneMessage(L("No hay datos de benchmark suficientes para dibujar el mapa.", "Not enough benchmark data to draw the map."));
     }
   } catch (error) {
     sceneFailedFor = signature;
-    sceneMessage("No se pudo cargar el visor 3D (" + (error && error.message ? error.message : "error desconocido") +
-      "). La pestaña Comparativa tiene exactamente los mismos datos.");
+    sceneMessage(L("No se pudo cargar el visor 3D (", "Could not load the 3D viewer (") + (error && error.message ? error.message : L("error desconocido", "unknown error")) +
+      L("). La pestaña Comparativa tiene exactamente los mismos datos.", "). The Comparison tab has exactly the same data."));
   }
 }
 
@@ -2937,7 +2945,7 @@ function renderSceneLegend() {
   var names = Object.keys(vendors).sort();
   if (sceneVendors) {
     legend.append(el("button", {
-      className: "toggle", type: "button", textContent: "Todos los fabricantes",
+      className: "toggle", type: "button", textContent: L("Todos los fabricantes", "All vendors"),
       onclick: function () { sceneVendors = null; renderFiltered(); }
     }));
   }
@@ -2947,7 +2955,7 @@ function renderSceneLegend() {
       className: "toggle",
       type: "button",
       attrs: { "aria-pressed": on ? "true" : "false" },
-      title: "Mostrar u ocultar " + vendor,
+      title: L("Mostrar u ocultar ", "Show or hide ") + vendor,
       onclick: function () { toggleSceneVendor(vendor); }
     }, [
       el("span", { className: "swatch", style: { background: vendorColor(vendor) } }),
@@ -2958,13 +2966,13 @@ function renderSceneLegend() {
   var unpriced = points.filter(function (point) { return point.cost === null; }).length;
   legend.append(el("span", {
     className: "tiny",
-    textContent: points.length + " esferas en pantalla · " + highlighted + " resaltadas con halo" +
-      (filterActive() ? " (" + activeModels().length + " pasan el filtro de arriba)" : "")
+    textContent: points.length + L(" esferas en pantalla · ", " spheres on screen · ") + highlighted + L(" resaltadas con halo", " highlighted with halo") +
+      (filterActive() ? " (" + activeModels().length + L(" pasan el filtro de arriba)", " pass the filter above)") : "")
   }));
   if (unpriced) {
     legend.append(el("span", {
       className: "tiny",
-      textContent: unpriced + " esferas huecas: sin precio público, fuera del eje X"
+      textContent: unpriced + L(" esferas huecas: sin precio público, fuera del eje X", " hollow spheres: no public price, off the X axis")
     }));
   }
   syncSceneButtons();
@@ -2976,9 +2984,9 @@ function renderAxisKey() {
   if (!host) return;
   clear("sceneAxes");
   [
-    ["#c07800", "x · Precio", "izquierda barato → derecha caro, en escala logarítmica"],
-    ["#157f3c", "y · Nota global", "abajo el peor modelo medido → arriba el mejor (escala 0–100)"],
-    ["#2461b8", "z · Velocidad", "fondo lento → frente rápido, en tokens por segundo"]
+    ["#c07800", L("x · Precio", "x · Price"), L("izquierda barato → derecha caro, en escala logarítmica", "cheap on the left → expensive on the right, log scale")],
+    ["#157f3c", L("y · Nota global", "y · Overall score"), L("abajo el peor modelo medido → arriba el mejor (escala 0–100)", "worst measured model at the bottom → best at the top (0–100 scale)")],
+    ["#2461b8", L("z · Velocidad", "z · Speed"), L("fondo lento → frente rápido, en tokens por segundo", "slow at the back → fast at the front, in tokens per second")]
   ].forEach(function (axis) {
     host.append(el("span", null, [
       el("span", { className: "swatch", style: { background: axis[0] } }),
@@ -3021,43 +3029,43 @@ function wireSceneButtons() {
 
 function renderGuide() {
   defs("guideDefs", [
-    ["Enrutado (Routing)", "Elige modelos para las cuatro etapas del flujo de trabajo (orchestrate, plan, execute, verify) y para los subagentes que lanza el agente principal. Orchestrate prepara la descomposición y los objetivos; Plan detalla la implementación; solo Execute implementa cambios."],
-    ["Exigencia (modelPolicy)", "Decide si el modelo fijado es obligatorio (required), una simple sugerencia (preferred) o si no opinas (inherit). Es lo que evita que una llamada suelta se vaya a un modelo caro sin que te enteres."],
-    ["Esfuerzo (effort)", "Cuánto piensa el modelo antes de contestar. Más esfuerzo resuelve mejor lo difícil y cuesta más por llamada; menos esfuerzo responde antes y gasta menos."],
-    ["Catálogo", "Los IDs de modelo que reporta el RPC de lista de modelos de esta sesión. Esta lista no inspecciona ajustes ni credenciales del proveedor y no garantiza que la inferencia vaya a funcionar. Incluye fabricante, categoría de precio, contexto y nota de benchmarks públicos cuando están disponibles."],
-    ["Comparativa", "La parte educativa: para cada tipo de tarea te dice qué modelo sale mejor y por qué, con las notas públicas de benchmarks y el precio al lado."],
-    ["Benchmark", "Una prueba estandarizada con la que se mide a los modelos. Ninguno gana en todo: hay quien escribe mejor código y quien razona mejor. Por eso la recomendación cambia según la tarea."],
-    ["Fabricante frente a proveedor", "El proveedor es quien te sirve el modelo (GitHub Copilot o tu proveedor externo). El fabricante es quien lo construyó (Anthropic, OpenAI, Alibaba…). Un mismo fabricante puede llegarte por las dos vías."],
-    ["Traer tu propia clave", "Los modelos del proveedor externo se pagan contra tu cuenta de ese proveedor, no contra la cuota de Copilot. Son los que hacen barato el trabajo masivo."],
-    ["Auto", "Cuando el agente elige modelo por su cuenta tiende a subir a los grandes. Fijar los subagentes con un modelo barato y exigencia required es lo que corta esa escalada."],
-    ["Instantánea de datos", "Un fichero JSON con fabricantes, precios, notas de benchmark y velocidades, generado desde fuentes públicas y actualizado periódicamente por el propio repositorio."],
-    ["Filtro por proveedor", "Reduce todo lo que ves a los modelos de un solo proveedor. Al elegir tu proveedor externo, las seis recomendaciones y los subagentes se recalculan usando solo esos modelos: sirve para comprobar qué conviene dentro de lo que ya pagas."],
-    ["Selección de modelos", "Puedes quitar modelos concretos de la comparación con un clic. El primer clic deja seleccionados todos y desmarca el que pulsaste, así que se quita de uno en uno. Mientras haya selección manual, todo se calcula con los que queden."],
-    ["Solo mis modelos", "La tabla de la pestaña Comparativa y el mapa 3D arrancan mostrando solo lo que coincide con tu catálogo, para no perder de vista los tuyos entre los demás. Al desactivarlo aparecen los 88 modelos del ranking público, útiles como referencia aunque no puedas escogerlos."],
-    ["Filtros del mapa 3D", "Además de la selección de arriba, el mapa tiene sus propios interruptores: quitar Solo mis modelos, ocultar las notas estimadas, ocultar el carril de las esferas sin precio, y aislar un fabricante pulsando su color en la leyenda."],
-    ["Notas estimadas (~)", "Si el benchmark no midió tu modelo exacto pero sí variantes de su familia, la nota es la mediana de esas variantes y va marcada con una tilde. Nunca se presenta como una medida directa."]
+    [L("Enrutado (Routing)", "Routing"), L("Elige modelos para las cuatro etapas del flujo de trabajo (orchestrate, plan, execute, verify) y para los subagentes que lanza el agente principal. Orchestrate prepara la descomposición y los objetivos; Plan detalla la implementación; solo Execute implementa cambios.", "Choose models for the four stages of the workflow (orchestrate, plan, execute, verify) and for the subagents the main agent launches. Orchestrate prepares the decomposition and goals; Plan details the implementation; only Execute implements changes.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy)", L("Decide si el modelo fijado es obligatorio (required), una simple sugerencia (preferred) o si no opinas (inherit). Es lo que evita que una llamada suelta se vaya a un modelo caro sin que te enteres.", "Decide whether the pinned model is mandatory (required), a simple suggestion (preferred), or whether you have no opinion (inherit). This is what prevents a loose call from drifting to an expensive model without you noticing.")],
+    [L("Esfuerzo", "Effort") + " (effort)", L("Cuánto piensa el modelo antes de contestar. Más esfuerzo resuelve mejor lo difícil y cuesta más por llamada; menos esfuerzo responde antes y gasta menos.", "How much the model thinks before answering. More effort solves hard problems better and costs more per call; less effort answers sooner and spends less.")],
+    [L("Catálogo", "Catalog"), L("Los IDs de modelo que reporta el RPC de lista de modelos de esta sesión. Esta lista no inspecciona ajustes ni credenciales del proveedor y no garantiza que la inferencia vaya a funcionar. Incluye fabricante, categoría de precio, contexto y nota de benchmarks públicos cuando están disponibles.", "The model IDs reported by this session's model-list RPC. This list does not inspect the provider's settings or credentials and does not guarantee inference will work. It includes vendor, price category, context, and public benchmark score when available.")],
+    [L("Comparativa", "Comparison"), L("La parte educativa: para cada tipo de tarea te dice qué modelo sale mejor y por qué, con las notas públicas de benchmarks y el precio al lado.", "The educational part: for each task type it tells you which model comes out best and why, with the public benchmark scores and price alongside.")],
+    ["Benchmark", L("Una prueba estandarizada con la que se mide a los modelos. Ninguno gana en todo: hay quien escribe mejor código y quien razona mejor. Por eso la recomendación cambia según la tarea.", "A standardized test used to measure models. None wins at everything: some write better code and some reason better. That is why the recommendation changes by task.")],
+    [L("Fabricante frente a proveedor", "Vendor vs provider"), L("El proveedor es quien te sirve el modelo (GitHub Copilot o tu proveedor externo). El fabricante es quien lo construyó (Anthropic, OpenAI, Alibaba…). Un mismo fabricante puede llegarte por las dos vías.", "The provider is whoever serves you the model (GitHub Copilot or your external provider). The vendor is whoever built it (Anthropic, OpenAI, Alibaba…). The same vendor can reach you through both channels.")],
+    [L("Traer tu propia clave", "Bring your own key"), L("Los modelos del proveedor externo se pagan contra tu cuenta de ese proveedor, no contra la cuota de Copilot. Son los que hacen barato el trabajo masivo.", "External provider models are billed against your account with that provider, not against your Copilot quota. They are what makes bulk work cheap.")],
+    ["Auto", L("Cuando el agente elige modelo por su cuenta tiende a subir a los grandes. Fijar los subagentes con un modelo barato y exigencia required es lo que corta esa escalada.", "When the agent picks a model on its own it tends to climb to the big ones. Pinning subagents to a cheap model with the required policy is what cuts off that escalation.")],
+    [L("Instantánea de datos", "Data snapshot"), L("Un fichero JSON con fabricantes, precios, notas de benchmark y velocidades, generado desde fuentes públicas y actualizado periódicamente por el propio repositorio.", "A JSON file with vendors, prices, benchmark scores, and speeds, generated from public sources and updated periodically by the repository itself.")],
+    [L("Filtro por proveedor", "Provider filter"), L("Reduce todo lo que ves a los modelos de un solo proveedor. Al elegir tu proveedor externo, las seis recomendaciones y los subagentes se recalculan usando solo esos modelos: sirve para comprobar qué conviene dentro de lo que ya pagas.", "Reduces everything you see to the models of a single provider. When you choose your external provider, the six recommendations and the subagents are recomputed using only those models: it helps check what is worth it within what you already pay.")],
+    [L("Selección de modelos", "Model selection"), L("Puedes quitar modelos concretos de la comparación con un clic. El primer clic deja seleccionados todos y desmarca el que pulsaste, así que se quita de uno en uno. Mientras haya selección manual, todo se calcula con los que queden.", "You can remove specific models from the comparison with a click. The first click selects all and deselects the one you pressed, so they are removed one at a time. While there is a manual selection, everything is computed with the ones that remain.")],
+    [L("Solo mis modelos", "Only my models"), L("La tabla de la pestaña Comparativa y el mapa 3D arrancan mostrando solo lo que coincide con tu catálogo, para no perder de vista los tuyos entre los demás. Al desactivarlo aparecen los 88 modelos del ranking público, útiles como referencia aunque no puedas escogerlos.", "The Comparison tab table and the 3D map start showing only what matches your catalog, so you keep yours in sight among the rest. Disabling it shows the 88 models of the public ranking, useful as reference even if you cannot pick them.")],
+    [L("Filtros del mapa 3D", "3D map filters"), L("Además de la selección de arriba, el mapa tiene sus propios interruptores: quitar Solo mis modelos, ocultar las notas estimadas, ocultar el carril de las esferas sin precio, y aislar un fabricante pulsando su color en la leyenda.", "Besides the selection above, the map has its own toggles: turn off Only my models, hide estimated scores, hide the lane of unpriced spheres, and isolate a vendor by clicking its color in the legend.")],
+    [L("Notas estimadas (~)", "Estimated scores (~)"), L("Si el benchmark no midió tu modelo exacto pero sí variantes de su familia, la nota es la mediana de esas variantes y va marcada con una tilde. Nunca se presenta como una medida directa.", "If the benchmark did not measure your exact model but did measure variants of its family, the score is the median of those variants and is marked with a tilde. It is never presented as a direct measurement.")]
   ]);
 }
 
 function renderSources() {
   defs("sourceDefs", [
-    ["models.dev", "Catálogo abierto de proveedores y modelos. Aporta fabricante, precios, contexto, capacidades y pesos abiertos. Licencia MIT. Mantenido por el proyecto anomalyco (antes sst).",
+    ["models.dev", L("Catálogo abierto de proveedores y modelos. Aporta fabricante, precios, contexto, capacidades y pesos abiertos. Licencia MIT. Mantenido por el proyecto anomalyco (antes sst).", "Open catalog of providers and models. Provides vendor, prices, context, capabilities, and open weights. MIT license. Maintained by the anomalyco project (formerly sst)."),
       "https://github.com/anomalyco/models.dev"],
-    ["chinese-llm-benchmark", "Repositorio público con clasificaciones por capacidad: razonamiento, código, uso de herramientas, terminal, medicina, derecho, finanzas… De aquí salen todas las notas de benchmark. Es el trabajo de jeinlee1991 y colaboradores; el repositorio no declara una licencia explícita, así que solo se reproducen las puntuaciones numéricas ya publicadas, sin copiar su código ni su texto.",
+    ["chinese-llm-benchmark", L("Repositorio público con clasificaciones por capacidad: razonamiento, código, uso de herramientas, terminal, medicina, derecho, finanzas… De aquí salen todas las notas de benchmark. Es el trabajo de jeinlee1991 y colaboradores; el repositorio no declara una licencia explícita, así que solo se reproducen las puntuaciones numéricas ya publicadas, sin copiar su código ni su texto.", "Public repository with rankings by capability: reasoning, code, tool use, terminal, medicine, law, finance… All benchmark scores come from here. It is the work of jeinlee1991 and collaborators; the repository does not declare an explicit license, so only the already-published numeric scores are reproduced, without copying its code or text."),
       "https://github.com/jeinlee1991/chinese-llm-benchmark"],
-    ["showdown", "Comparativa pública de velocidad y latencia, usada además para contrastar precios y completar huecos. Licencia AGPL-3.0. De aquí solo se extraen los valores numéricos de velocidad; no se reutiliza su código.",
+    ["showdown", L("Comparativa pública de velocidad y latencia, usada además para contrastar precios y completar huecos. Licencia AGPL-3.0. De aquí solo se extraen los valores numéricos de velocidad; no se reutiliza su código.", "Public comparison of speed and latency, also used to cross-check prices and fill gaps. AGPL-3.0 license. Only the numeric speed values are extracted from here; its code is not reused."),
       "https://github.com/verseles/showdown"],
-    ["three.js", "Biblioteca con la que se dibuja la pestaña 3D. Se incluye empaquetada dentro de la extensión, así que el panel funciona sin conexión. Licencia MIT.",
+    ["three.js", L("Biblioteca con la que se dibuja la pestaña 3D. Se incluye empaquetada dentro de la extensión, así que el panel funciona sin conexión. Licencia MIT.", "Library used to draw the 3D tab. It is bundled inside the extension, so the panel works offline. MIT license."),
       "https://github.com/mrdoob/three.js"],
-    ["Instantánea", "Las tres fuentes de datos se cruzan en un único JSON que se descarga el propio panel. Si no hay conexión, se usa la copia incluida con la extensión."],
-    ["Actualización automática", "Un flujo de trabajo del repositorio regenera la instantánea cada semana y la publica, así que el panel no tiene que mantener ninguna lista a mano."],
-    ["~ (nota estimada)", "Cuando el benchmark no midió ese modelo exacto pero sí variantes de su misma familia, se muestra la mediana de esas variantes marcada con una tilde. Es una estimación, no una medida directa, y el panel lo dice explícitamente en lugar de dejarlo pasar por un dato real."],
-    ["Sin precio público", "Algunos modelos medidos no publican tarifa. No se pueden colocar en un eje de precio, así que la tabla los deja sin coste y el 3D los dibuja huecos en un carril aparte."]
+    [L("Instantánea", "Snapshot"), L("Las tres fuentes de datos se cruzan en un único JSON que se descarga el propio panel. Si no hay conexión, se usa la copia incluida con la extensión.", "The three data sources are crossed into a single JSON that the panel itself downloads. If there is no connection, the copy bundled with the extension is used.")],
+    [L("Actualización automática", "Automatic updates"), L("Un flujo de trabajo del repositorio regenera la instantánea cada semana y la publica, así que el panel no tiene que mantener ninguna lista a mano.", "A repository workflow regenerates the snapshot every week and publishes it, so the panel does not have to maintain any list by hand.")],
+    [L("~ (nota estimada)", "~ (estimated score)"), L("Cuando el benchmark no midió ese modelo exacto pero sí variantes de su misma familia, se muestra la mediana de esas variantes marcada con una tilde. Es una estimación, no una medida directa, y el panel lo dice explícitamente en lugar de dejarlo pasar por un dato real.", "When the benchmark did not measure that exact model but did measure variants of its same family, the median of those variants is shown marked with a tilde. It is an estimate, not a direct measurement, and the panel says so explicitly instead of letting it pass for real data.")],
+    [L("Sin precio público", "No public price"), L("Algunos modelos medidos no publican tarifa. No se pueden colocar en un eje de precio, así que la tabla los deja sin coste y el 3D los dibuja huecos en un carril aparte.", "Some measured models do not publish a rate. They cannot be placed on a price axis, so the table leaves them without cost and the 3D draws them hollow in a separate lane.")]
   ]);
   var parts = [];
-  if (benchMeta && benchMeta.generatedAt) parts.push("Instantánea actual: " + benchMeta.generatedAt.slice(0, 10) + ".");
-  parts.push(benchSource === "downloaded" ? "Se está usando la versión descargada del repositorio." : benchSource === "bundled" ? "Se está usando la copia incluida con la extensión." : "No se ha podido cargar ninguna instantánea.");
-  if (repoUrl) parts.push("Repositorio del panel: " + repoUrl);
+  if (benchMeta && benchMeta.generatedAt) parts.push(L("Instantánea actual: ", "Current snapshot: ") + benchMeta.generatedAt.slice(0, 10) + ".");
+  parts.push(benchSource === "downloaded" ? L("Se está usando la versión descargada del repositorio.", "The downloaded repository version is being used.") : benchSource === "bundled" ? L("Se está usando la copia incluida con la extensión.", "The copy bundled with the extension is being used.") : L("No se ha podido cargar ninguna instantánea.", "No snapshot could be loaded."));
+  if (repoUrl) parts.push(L("Repositorio del panel: ", "Panel repository: ") + repoUrl);
   document.getElementById("sourceMeta").textContent = parts.join(" ");
 }
 
@@ -3085,14 +3093,14 @@ async function post(path, body) {
 
 /** Nombre humano de un modelo: etiqueta del catálogo si existe, id si no. */
 function modelLabel(id) {
-  if (!id) return "(sin definir)";
+  if (!id) return L("(sin definir)", "(unset)");
   var model = findModel(id);
   return model ? model.label : id;
 }
 
 function fallbackLabel(list) {
   var arr = Array.isArray(list) ? list : [];
-  return arr.length ? arr.map(modelLabel).join(" → ") : "(ninguno)";
+  return arr.length ? arr.map(modelLabel).join(" → ") : L("(ninguno)", "(none)");
 }
 
 /**
@@ -3102,22 +3110,22 @@ function fallbackLabel(list) {
 function diffRoutingRows(base, next) {
   base = base || {}; next = next || {};
   var groups = [];
-  function group(title) {
-    var g = groups.find(function (x) { return x.title === title; });
-    if (!g) { g = { title: title, rows: [] }; groups.push(g); }
+  function group(key, title) {
+    var g = groups.find(function (x) { return x.key === key; });
+    if (!g) { g = { key: key, title: title, rows: [] }; groups.push(g); }
     return g;
   }
-  function add(title, label, before, after) {
+  function add(key, title, label, before, after) {
     if (before === after) return;
-    group(title).rows.push({ label: label, before: before, after: after });
+    group(key, title).rows.push({ label: label, before: before, after: after });
   }
 
   ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
     var b = (base.roles && base.roles[role]) || {};
     var n = (next.roles && next.roles[role]) || {};
-    add("Roles del workflow", role + " · modelo", modelLabel(b.model), modelLabel(n.model));
-    add("Roles del workflow", role + " · esfuerzo", b.effort || "(sin definir)", n.effort || "(sin definir)");
-    add("Roles del workflow", role + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
+    add("roles", L("Roles del workflow", "Workflow roles"), role + L(" · modelo", " · model"), modelLabel(b.model), modelLabel(n.model));
+    add("roles", L("Roles del workflow", "Workflow roles"), role + L(" · esfuerzo", " · effort"), b.effort || L("(sin definir)", "(unset)"), n.effort || L("(sin definir)", "(unset)"));
+    add("roles", L("Roles del workflow", "Workflow roles"), role + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
   });
 
   var ba = (base.subagents && base.subagents.agents) || {};
@@ -3127,24 +3135,24 @@ function diffRoutingRows(base, next) {
   types.forEach(function (type) {
     var b = ba[type] || {};
     var n = na[type] || {};
-    add("Subagentes", type + " · modelo", modelLabel(b.model), modelLabel(n.model));
-    add("Subagentes", type + " · esfuerzo", b.effortLevel || "(sin definir)", n.effortLevel || "(sin definir)");
-    add("Subagentes", type + " · exigencia", b.modelPolicy || "inherit", n.modelPolicy || "inherit");
-    add("Subagentes", type + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
+    add("subagents", L("Subagentes", "Subagents"), type + L(" · modelo", " · model"), modelLabel(b.model), modelLabel(n.model));
+    add("subagents", L("Subagentes", "Subagents"), type + L(" · esfuerzo", " · effort"), b.effortLevel || L("(sin definir)", "(unset)"), n.effortLevel || L("(sin definir)", "(unset)"));
+    add("subagents", L("Subagentes", "Subagents"), type + L(" · exigencia", " · strictness"), b.modelPolicy || "inherit", n.modelPolicy || "inherit");
+    add("subagents", L("Subagentes", "Subagents"), type + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
   });
 
   var bc = base.subagents && base.subagents.maxConcurrency;
   var nc = next.subagents && next.subagents.maxConcurrency;
-  add("Subagentes", "maxConcurrency", bc === undefined ? "(por defecto 4)" : String(bc), nc === undefined ? "(por defecto 4)" : String(nc));
+  add("subagents", L("Subagentes", "Subagents"), "maxConcurrency", bc === undefined ? L("(por defecto 4)", "(default 4)") : String(bc), nc === undefined ? L("(por defecto 4)", "(default 4)") : String(nc));
 
   var bl = base.providerLabels || {};
   var nl = next.providerLabels || {};
   var pids = Object.keys(nl).filter(function (k) { return Object.keys(bl).indexOf(k) < 0; });
   Object.keys(bl).forEach(function (k) { if (nl[k] !== bl[k]) pids.push(k); });
   pids.forEach(function (pid) {
-    var b = bl[pid] === undefined || bl[pid] === null ? "(auto)" : bl[pid];
-    var n = nl[pid] === undefined || nl[pid] === null ? "(auto)" : nl[pid];
-    add("Etiquetas de proveedor", providerLabel(pid), b, n);
+    var b = bl[pid] === undefined || bl[pid] === null ? L("(auto)", "(auto)") : bl[pid];
+    var n = nl[pid] === undefined || nl[pid] === null ? L("(auto)", "(auto)") : nl[pid];
+    add("providers", L("Etiquetas de proveedor", "Provider labels"), providerLabel(pid), b, n);
   });
 
   return groups.filter(function (g) { return g.rows.length; });
@@ -3153,8 +3161,8 @@ function diffRoutingRows(base, next) {
 function pinCount(rows) {
   var count = 0;
   rows.forEach(function (g) {
-    if (g.title !== "Subagentes") return;
-    g.rows.forEach(function (r) { if (/·\s*modelo$/.test(r.label) && r.after !== "(sin definir)") count += 1; });
+    if (g.key !== "subagents") return;
+    g.rows.forEach(function (r) { if (/·\s*(modelo|model)$/.test(r.label) && r.after !== L("(sin definir)", "(unset)")) count += 1; });
   });
   return count;
 }
@@ -3186,7 +3194,7 @@ function modalChrome(titleText, widthClass) {
   }
   modal.append(el("div", { className: "fb-modal-head" }, [
     el("strong", { className: "fb-modal-title", textContent: titleText }),
-    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar" }, onclick: detach })
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: L("Cerrar", "Close"), attrs: { "aria-label": L("Cerrar", "Close") }, onclick: detach })
   ]));
   back.append(modal);
   document.body.append(back);
@@ -3199,13 +3207,13 @@ function modalChrome(titleText, widthClass) {
  * "antes → después" y exige un clic en «Aplicar» para escribir en disco.
  */
 function openReviewModal(rows, opts) {
-  var chrome = modalChrome(opts.title || "Revisar cambios", " rev-modal");
+  var chrome = modalChrome(opts.title || L("Revisar cambios", "Review changes"), " rev-modal");
   var modal = chrome.modal;
   if (opts.warning) {
     modal.append(el("p", { className: "rev-warn", textContent: opts.warning }));
   }
   if (!rows.length) {
-    modal.append(el("p", { className: "rev-warn", textContent: "No hay cambios que guardar: lo que ves en pantalla coincide con lo guardado." }));
+    modal.append(el("p", { className: "rev-warn", textContent: L("No hay cambios que guardar: lo que ves en pantalla coincide con lo guardado.", "There are no changes to save: what you see on screen matches what is saved.") }));
   }
   rows.forEach(function (g) {
     modal.append(el("div", { className: "fb-group", textContent: g.title }));
@@ -3224,36 +3232,36 @@ function openReviewModal(rows, opts) {
     var pins = pinCount(rows);
     modal.append(el("p", {
       className: "rev-summary",
-      textContent: "Afectará a " + pins + (pins === 1 ? " subagente fijado." : " subagentes fijados.")
+      textContent: L("Afectará a ", "Will affect ") + pins + (pins === 1 ? L(" subagente fijado.", " pinned subagent.") : L(" subagentes fijados.", " pinned subagents."))
     }));
     var actions = el("div", { className: "rev-actions" });
-    var cancel = el("button", { type: "button", textContent: "Cancelar", onclick: chrome.detach });
-    var confirm = el("button", { type: "button", className: "primary", textContent: opts.confirmText || "Aplicar" });
+    var cancel = el("button", { type: "button", textContent: L("Cancelar", "Cancel"), onclick: chrome.detach });
+    var confirm = el("button", { type: "button", className: "primary", textContent: opts.confirmText || L("Aplicar", "Apply") });
     confirm.onclick = function () { confirm.disabled = true; chrome.detach(); opts.onConfirm(); };
     actions.append(cancel, confirm);
     modal.append(actions);
     try { confirm.focus(); } catch (_) {}
   } else {
-    var ok = el("button", { type: "button", className: "primary", textContent: "Cerrar", onclick: chrome.detach });
+    var ok = el("button", { type: "button", className: "primary", textContent: L("Cerrar", "Close"), onclick: chrome.detach });
     modal.append(el("div", { className: "rev-actions" }, ok));
     try { ok.focus(); } catch (_) {}
   }
 }
 
 function openConflictModal() {
-  var chrome = modalChrome("Conflicto de guardado", " rev-modal");
+  var chrome = modalChrome(L("Conflicto de guardado", "Save conflict"), " rev-modal");
   var modal = chrome.modal;
-  modal.append(el("p", { className: "rev-warn", textContent: "Otra ventana guardó cambios antes que tú. Elige qué hacer antes de escribir nada." }));
+  modal.append(el("p", { className: "rev-warn", textContent: L("Otra ventana guardó cambios antes que tú. Elige qué hacer antes de escribir nada.", "Another window saved changes before you. Choose what to do before writing anything.") }));
   var actions = el("div", { className: "rev-actions" });
   actions.append(el("button", {
     type: "button",
-    textContent: "Cancelar",
+    textContent: L("Cancelar", "Cancel"),
     onclick: chrome.detach
   }));
   actions.append(el("button", {
     type: "button",
-    textContent: "Descartar mis cambios",
-    title: "Sustituye lo que tienes en pantalla por lo que está guardado",
+    textContent: L("Descartar mis cambios", "Discard my changes"),
+    title: L("Sustituye lo que tienes en pantalla por lo que está guardado", "Replaces what you have on screen with what is saved"),
     onclick: function () {
       chrome.detach();
       discardPending();
@@ -3262,8 +3270,8 @@ function openConflictModal() {
   var overwrite = el("button", {
     type: "button",
     className: "danger",
-    textContent: "Sobrescribir de todas formas",
-    title: "Escribe tus cambios encima de los de la otra ventana",
+    textContent: L("Sobrescribir de todas formas", "Overwrite anyway"),
+    title: L("Escribe tus cambios encima de los de la otra ventana", "Writes your changes over the other window's"),
     onclick: function () { chrome.detach(); doSave(true); }
   });
   actions.append(overwrite);
@@ -3279,10 +3287,10 @@ async function discardPending() {
     savedRouting = cloneConfig(state);
     routingRevision = payload.revision || "absent";
     dirty = false;
-    setStatus("Cambios locales descartados; ahora trabajas sobre lo guardado.", "ok");
+    setStatus(L("Cambios locales descartados; ahora trabajas sobre lo guardado.", "Local changes discarded; you are now working on the saved version."), "ok");
     renderAll();
   } catch (error) {
-    setStatus("No se pudo recargar lo guardado: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo recargar lo guardado: ", "Could not reload the saved data: ") + (error.serverError || error.message), "err");
   }
 }
 
@@ -3297,8 +3305,8 @@ function setSavedStatus(text) {
   var undo = el("button", {
     type: "button",
     className: "toggle",
-    textContent: "Deshacer último cambio",
-    title: "Restaura la configuración guardada antes de este cambio",
+    textContent: L("Deshacer último cambio", "Undo last change"),
+    title: L("Restaura la configuración guardada antes de este cambio", "Restores the configuration saved before this change"),
     onclick: function () { doUndo(undo); }
   });
   node.append(undo);
@@ -3306,12 +3314,12 @@ function setSavedStatus(text) {
     type: "button",
     className: "toggle",
     textContent: "✕",
-    title: "Ocultar",
-    attrs: { "aria-label": "Ocultar aviso de guardado" },
+    title: L("Ocultar", "Hide"),
+    attrs: { "aria-label": L("Ocultar aviso de guardado", "Hide save notice") },
     onclick: function () {
       node.replaceChildren();
       dirty = false;
-      setStatus("Hay cambios sin guardar.", "warn");
+      setStatus(L("Hay cambios sin guardar.", "Unsaved changes."), "warn");
       if (!pendingChanges()) setStatus("", "");
     }
   });
@@ -3326,7 +3334,7 @@ function pendingChanges() {
 
 async function doUndo(button) {
   if (button) button.disabled = true;
-  setStatus("Deshaciendo…");
+  setStatus(L("Deshaciendo…", "Undoing…"));
   try {
     var result = await post("/undo", {});
     state = result.routing;
@@ -3334,14 +3342,14 @@ async function doUndo(button) {
     routingRevision = result.revision || "absent";
     dirty = false;
     renderAll();
-    setStatus("Último cambio deshecho.", "ok");
+    setStatus(L("Último cambio deshecho.", "Last change undone."), "ok");
   } catch (error) {
-    setStatus("No se pudo deshacer: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo deshacer: ", "Could not undo: ") + (error.serverError || error.message), "err");
   }
 }
 
 async function doSave(force) {
-  setStatus("Guardando…");
+  setStatus(L("Guardando…", "Saving…"));
   var body = cloneConfig(state);
   if (!force) body.baseRevision = routingRevision;
   try {
@@ -3351,7 +3359,7 @@ async function doSave(force) {
     routingRevision = result.revision || "absent";
     dirty = false;
     renderAll();
-    setSavedStatus(result.applied ? "Guardado y aplicado a la sesión." : "Guardado.");
+    setSavedStatus(result.applied ? L("Guardado y aplicado a la sesión.", "Saved and applied to the session.") : L("Guardado.", "Saved."));
   } catch (error) {
     if (error.status === 412 && error.payload && error.payload.routing) {
       // El servidor rechazó escribir: adopta la revisión en disco como base
@@ -3359,47 +3367,47 @@ async function doSave(force) {
       savedRouting = cloneConfig(error.payload.routing);
       routingRevision = error.payload.revision || "absent";
       openConflictModal();
-      setStatus("Conflicto: otra ventana guardó antes.", "err");
+      setStatus(L("Conflicto: otra ventana guardó antes.", "Conflict: another window saved first."), "err");
       return;
     }
-    setStatus("No se pudo guardar: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo guardar: ", "Could not save: ") + (error.serverError || error.message), "err");
   }
 }
 
 async function doReset() {
-  setStatus("Calculando diferencias…");
+  setStatus(L("Calculando diferencias…", "Calculating differences…"));
   var defaults;
   try {
     defaults = (await (await fetch("/defaults")).json()).routing;
   } catch (error) {
-    setStatus("No se pudieron leer los valores por defecto: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudieron leer los valores por defecto: ", "Could not read the default values: ") + (error.serverError || error.message), "err");
     return;
   }
   var rows = diffRoutingRows(state, defaults);
   openReviewModal(rows, {
-    title: "Restaurar valores por defecto",
-    warning: "Esto reemplaza TODA la configuración por los valores por defecto del catálogo detectado. Podrás deshacerlo una vez.",
-    confirmText: "Restaurar",
+    title: L("Restaurar valores por defecto", "Restore default values"),
+    warning: L("Esto reemplaza TODA la configuración por los valores por defecto del catálogo detectado. Podrás deshacerlo una vez.", "This replaces ALL configuration with the detected catalog's defaults. You can undo it once."),
+    confirmText: L("Restaurar", "Restore"),
     onConfirm: function () {
       var body = {};
       body.baseRevision = routingRevision;
-      setStatus("Restaurando…");
+      setStatus(L("Restaurando…", "Restoring…"));
       post("/reset", body).then(function (result) {
         state = result.routing;
         savedRouting = cloneConfig(result.routing);
         routingRevision = result.revision || "absent";
         dirty = false;
         renderAll();
-        setSavedStatus("Valores por defecto restaurados.");
+        setSavedStatus(L("Valores por defecto restaurados.", "Default values restored."));
       }).catch(function (error) {
         if (error.status === 412 && error.payload && error.payload.routing) {
           savedRouting = cloneConfig(error.payload.routing);
           routingRevision = error.payload.revision || "absent";
           openConflictModal();
-          setStatus("Conflicto: otra ventana guardó antes.", "err");
+          setStatus(L("Conflicto: otra ventana guardó antes.", "Conflict: another window saved first."), "err");
           return;
         }
-        setStatus("No se pudo restaurar: " + (error.serverError || error.message), "err");
+        setStatus(L("No se pudo restaurar: ", "Could not restore: ") + (error.serverError || error.message), "err");
       });
     }
   });
@@ -3407,7 +3415,7 @@ async function doReset() {
 
 function applyRouting() {
   var rows = diffRoutingRows(savedRouting, state);
-  openReviewModal(rows, { title: "Revisar cambios", confirmText: "Aplicar", onConfirm: function () { doSave(false); } });
+  openReviewModal(rows, { title: L("Revisar cambios", "Review changes"), confirmText: L("Aplicar", "Apply"), onConfirm: function () { doSave(false); } });
 }
 
 function resetRouting() {
@@ -3415,7 +3423,7 @@ function resetRouting() {
 }
 
 async function refreshData() {
-  setStatus("Actualizando catálogo y datos públicos…");
+  setStatus(L("Actualizando catálogo y datos públicos…", "Updating catalog and public data…"));
   try {
     var payload = await (await fetch("/catalog?refresh=1")).json();
     if (payload.catalog) {
@@ -3429,16 +3437,16 @@ async function refreshData() {
     if (data.source) benchSource = data.source;
     sceneSignature = null;
     if (three) disposeScene();
-    setStatus("Datos actualizados.", "ok");
+    setStatus(L("Datos actualizados.", "Data updated."), "ok");
     renderAll();
   } catch (error) {
-    setStatus("No se pudo actualizar: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo actualizar: ", "Could not update: ") + (error.serverError || error.message), "err");
   }
 }
 
 async function refreshCatalog() {
   var status = document.getElementById("catalogRefreshStatus");
-  status.textContent = "Actualizando la lista de modelos de la sesión…";
+  status.textContent = L("Actualizando la lista de modelos de la sesión…", "Updating the session's model list…");
   status.dataset.tone = "";
   try {
     var response = await fetch("/catalog?refresh=1");
@@ -3448,12 +3456,12 @@ async function refreshCatalog() {
     catalogDiagnostics = payload.diagnostics || {};
     catalog = catalogGroups(catalogSnapshot);
     status.textContent = catalogSnapshot.source === "live"
-      ? "Lista de modelos actualizada."
-      : "Actualización terminada, pero solo hay disponible el catálogo de respaldo.";
+      ? L("Lista de modelos actualizada.", "Model list updated.")
+      : L("Actualización terminada, pero solo hay disponible el catálogo de respaldo.", "Update finished, but only the fallback catalog is available.");
     status.dataset.tone = catalogSnapshot.source === "live" ? "ok" : "warn";
     renderAll();
   } catch (error) {
-    status.textContent = "No se pudo actualizar la lista de modelos: " + error.message;
+    status.textContent = L("No se pudo actualizar la lista de modelos: ", "Could not update the model list: ") + error.message;
     status.dataset.tone = "err";
   }
 }
