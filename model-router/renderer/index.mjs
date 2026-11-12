@@ -57,17 +57,34 @@ export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, e
     };
 
     return `<!doctype html>
-<html lang="es">
+<html lang="es" data-lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Model Router</title>
+<script>
+(function () {
+    // El script del <head> fija el idioma ANTES de pintar el body: preferencia
+    // guardada en localStorage o, si no hay ninguna, el idioma del navegador.
+    // CSS decide cuál de las dos cadenas estáticas (.ie / .ien) se ve.
+    var lang = "es";
+    try {
+        var saved = localStorage.getItem("mr-lang");
+        if (saved === "es" || saved === "en") lang = saved;
+        else if (String(navigator.language || "").toLowerCase().indexOf("en") === 0) lang = "en";
+    } catch (e) {}
+    var root = document.documentElement;
+    root.setAttribute("data-lang", lang);
+    root.setAttribute("lang", lang);
+})();
+</script>
 <style>${STYLES}</style>
 </head>
 <body>
 ${BODY}
 <script>
 const BOOT = ${escapeJsonForScript(boot)};
+var UI_LANG = document.documentElement.getAttribute("data-lang") === "en" ? "en" : "es";
 ${CLIENT}
 </script>
 </body>

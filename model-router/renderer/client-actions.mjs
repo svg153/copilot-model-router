@@ -23,14 +23,14 @@ async function post(path, body) {
 
 /** Nombre humano de un modelo: etiqueta del catálogo si existe, id si no. */
 function modelLabel(id) {
-  if (!id) return "(sin definir)";
+  if (!id) return L("(sin definir)", "(unset)");
   var model = findModel(id);
   return model ? model.label : id;
 }
 
 function fallbackLabel(list) {
   var arr = Array.isArray(list) ? list : [];
-  return arr.length ? arr.map(modelLabel).join(" → ") : "(ninguno)";
+  return arr.length ? arr.map(modelLabel).join(" → ") : L("(ninguno)", "(none)");
 }
 
 /**
@@ -40,22 +40,22 @@ function fallbackLabel(list) {
 function diffRoutingRows(base, next) {
   base = base || {}; next = next || {};
   var groups = [];
-  function group(title) {
-    var g = groups.find(function (x) { return x.title === title; });
-    if (!g) { g = { title: title, rows: [] }; groups.push(g); }
+  function group(key, title) {
+    var g = groups.find(function (x) { return x.key === key; });
+    if (!g) { g = { key: key, title: title, rows: [] }; groups.push(g); }
     return g;
   }
-  function add(title, label, before, after) {
+  function add(key, title, label, before, after) {
     if (before === after) return;
-    group(title).rows.push({ label: label, before: before, after: after });
+    group(key, title).rows.push({ label: label, before: before, after: after });
   }
 
   ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
     var b = (base.roles && base.roles[role]) || {};
     var n = (next.roles && next.roles[role]) || {};
-    add("Roles del workflow", role + " · modelo", modelLabel(b.model), modelLabel(n.model));
-    add("Roles del workflow", role + " · esfuerzo", b.effort || "(sin definir)", n.effort || "(sin definir)");
-    add("Roles del workflow", role + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
+    add("roles", L("Roles del workflow", "Workflow roles"), role + L(" · modelo", " · model"), modelLabel(b.model), modelLabel(n.model));
+    add("roles", L("Roles del workflow", "Workflow roles"), role + L(" · esfuerzo", " · effort"), b.effort || L("(sin definir)", "(unset)"), n.effort || L("(sin definir)", "(unset)"));
+    add("roles", L("Roles del workflow", "Workflow roles"), role + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
   });
 
   var ba = (base.subagents && base.subagents.agents) || {};
@@ -65,24 +65,24 @@ function diffRoutingRows(base, next) {
   types.forEach(function (type) {
     var b = ba[type] || {};
     var n = na[type] || {};
-    add("Subagentes", type + " · modelo", modelLabel(b.model), modelLabel(n.model));
-    add("Subagentes", type + " · esfuerzo", b.effortLevel || "(sin definir)", n.effortLevel || "(sin definir)");
-    add("Subagentes", type + " · exigencia", b.modelPolicy || "inherit", n.modelPolicy || "inherit");
-    add("Subagentes", type + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
+    add("subagents", L("Subagentes", "Subagents"), type + L(" · modelo", " · model"), modelLabel(b.model), modelLabel(n.model));
+    add("subagents", L("Subagentes", "Subagents"), type + L(" · esfuerzo", " · effort"), b.effortLevel || L("(sin definir)", "(unset)"), n.effortLevel || L("(sin definir)", "(unset)"));
+    add("subagents", L("Subagentes", "Subagents"), type + L(" · exigencia", " · strictness"), b.modelPolicy || "inherit", n.modelPolicy || "inherit");
+    add("subagents", L("Subagentes", "Subagents"), type + " · fallback", fallbackLabel(b.fallback), fallbackLabel(n.fallback));
   });
 
   var bc = base.subagents && base.subagents.maxConcurrency;
   var nc = next.subagents && next.subagents.maxConcurrency;
-  add("Subagentes", "maxConcurrency", bc === undefined ? "(por defecto 4)" : String(bc), nc === undefined ? "(por defecto 4)" : String(nc));
+  add("subagents", L("Subagentes", "Subagents"), "maxConcurrency", bc === undefined ? L("(por defecto 4)", "(default 4)") : String(bc), nc === undefined ? L("(por defecto 4)", "(default 4)") : String(nc));
 
   var bl = base.providerLabels || {};
   var nl = next.providerLabels || {};
   var pids = Object.keys(nl).filter(function (k) { return Object.keys(bl).indexOf(k) < 0; });
   Object.keys(bl).forEach(function (k) { if (nl[k] !== bl[k]) pids.push(k); });
   pids.forEach(function (pid) {
-    var b = bl[pid] === undefined || bl[pid] === null ? "(auto)" : bl[pid];
-    var n = nl[pid] === undefined || nl[pid] === null ? "(auto)" : nl[pid];
-    add("Etiquetas de proveedor", providerLabel(pid), b, n);
+    var b = bl[pid] === undefined || bl[pid] === null ? L("(auto)", "(auto)") : bl[pid];
+    var n = nl[pid] === undefined || nl[pid] === null ? L("(auto)", "(auto)") : nl[pid];
+    add("providers", L("Etiquetas de proveedor", "Provider labels"), providerLabel(pid), b, n);
   });
 
   return groups.filter(function (g) { return g.rows.length; });
@@ -91,8 +91,8 @@ function diffRoutingRows(base, next) {
 function pinCount(rows) {
   var count = 0;
   rows.forEach(function (g) {
-    if (g.title !== "Subagentes") return;
-    g.rows.forEach(function (r) { if (/·\s*modelo$/.test(r.label) && r.after !== "(sin definir)") count += 1; });
+    if (g.key !== "subagents") return;
+    g.rows.forEach(function (r) { if (/·\s*(modelo|model)$/.test(r.label) && r.after !== L("(sin definir)", "(unset)")) count += 1; });
   });
   return count;
 }
@@ -124,7 +124,7 @@ function modalChrome(titleText, widthClass) {
   }
   modal.append(el("div", { className: "fb-modal-head" }, [
     el("strong", { className: "fb-modal-title", textContent: titleText }),
-    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar" }, onclick: detach })
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: L("Cerrar", "Close"), attrs: { "aria-label": L("Cerrar", "Close") }, onclick: detach })
   ]));
   back.append(modal);
   document.body.append(back);
@@ -137,13 +137,13 @@ function modalChrome(titleText, widthClass) {
  * "antes → después" y exige un clic en «Aplicar» para escribir en disco.
  */
 function openReviewModal(rows, opts) {
-  var chrome = modalChrome(opts.title || "Revisar cambios", " rev-modal");
+  var chrome = modalChrome(opts.title || L("Revisar cambios", "Review changes"), " rev-modal");
   var modal = chrome.modal;
   if (opts.warning) {
     modal.append(el("p", { className: "rev-warn", textContent: opts.warning }));
   }
   if (!rows.length) {
-    modal.append(el("p", { className: "rev-warn", textContent: "No hay cambios que guardar: lo que ves en pantalla coincide con lo guardado." }));
+    modal.append(el("p", { className: "rev-warn", textContent: L("No hay cambios que guardar: lo que ves en pantalla coincide con lo guardado.", "There are no changes to save: what you see on screen matches what is saved.") }));
   }
   rows.forEach(function (g) {
     modal.append(el("div", { className: "fb-group", textContent: g.title }));
@@ -162,36 +162,36 @@ function openReviewModal(rows, opts) {
     var pins = pinCount(rows);
     modal.append(el("p", {
       className: "rev-summary",
-      textContent: "Afectará a " + pins + (pins === 1 ? " subagente fijado." : " subagentes fijados.")
+      textContent: L("Afectará a ", "Will affect ") + pins + (pins === 1 ? L(" subagente fijado.", " pinned subagent.") : L(" subagentes fijados.", " pinned subagents."))
     }));
     var actions = el("div", { className: "rev-actions" });
-    var cancel = el("button", { type: "button", textContent: "Cancelar", onclick: chrome.detach });
-    var confirm = el("button", { type: "button", className: "primary", textContent: opts.confirmText || "Aplicar" });
+    var cancel = el("button", { type: "button", textContent: L("Cancelar", "Cancel"), onclick: chrome.detach });
+    var confirm = el("button", { type: "button", className: "primary", textContent: opts.confirmText || L("Aplicar", "Apply") });
     confirm.onclick = function () { confirm.disabled = true; chrome.detach(); opts.onConfirm(); };
     actions.append(cancel, confirm);
     modal.append(actions);
     try { confirm.focus(); } catch (_) {}
   } else {
-    var ok = el("button", { type: "button", className: "primary", textContent: "Cerrar", onclick: chrome.detach });
+    var ok = el("button", { type: "button", className: "primary", textContent: L("Cerrar", "Close"), onclick: chrome.detach });
     modal.append(el("div", { className: "rev-actions" }, ok));
     try { ok.focus(); } catch (_) {}
   }
 }
 
 function openConflictModal() {
-  var chrome = modalChrome("Conflicto de guardado", " rev-modal");
+  var chrome = modalChrome(L("Conflicto de guardado", "Save conflict"), " rev-modal");
   var modal = chrome.modal;
-  modal.append(el("p", { className: "rev-warn", textContent: "Otra ventana guardó cambios antes que tú. Elige qué hacer antes de escribir nada." }));
+  modal.append(el("p", { className: "rev-warn", textContent: L("Otra ventana guardó cambios antes que tú. Elige qué hacer antes de escribir nada.", "Another window saved changes before you. Choose what to do before writing anything.") }));
   var actions = el("div", { className: "rev-actions" });
   actions.append(el("button", {
     type: "button",
-    textContent: "Cancelar",
+    textContent: L("Cancelar", "Cancel"),
     onclick: chrome.detach
   }));
   actions.append(el("button", {
     type: "button",
-    textContent: "Descartar mis cambios",
-    title: "Sustituye lo que tienes en pantalla por lo que está guardado",
+    textContent: L("Descartar mis cambios", "Discard my changes"),
+    title: L("Sustituye lo que tienes en pantalla por lo que está guardado", "Replaces what you have on screen with what is saved"),
     onclick: function () {
       chrome.detach();
       discardPending();
@@ -200,8 +200,8 @@ function openConflictModal() {
   var overwrite = el("button", {
     type: "button",
     className: "danger",
-    textContent: "Sobrescribir de todas formas",
-    title: "Escribe tus cambios encima de los de la otra ventana",
+    textContent: L("Sobrescribir de todas formas", "Overwrite anyway"),
+    title: L("Escribe tus cambios encima de los de la otra ventana", "Writes your changes over the other window's"),
     onclick: function () { chrome.detach(); doSave(true); }
   });
   actions.append(overwrite);
@@ -217,10 +217,10 @@ async function discardPending() {
     savedRouting = cloneConfig(state);
     routingRevision = payload.revision || "absent";
     dirty = false;
-    setStatus("Cambios locales descartados; ahora trabajas sobre lo guardado.", "ok");
+    setStatus(L("Cambios locales descartados; ahora trabajas sobre lo guardado.", "Local changes discarded; you are now working on the saved version."), "ok");
     renderAll();
   } catch (error) {
-    setStatus("No se pudo recargar lo guardado: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo recargar lo guardado: ", "Could not reload the saved data: ") + (error.serverError || error.message), "err");
   }
 }
 
@@ -235,8 +235,8 @@ function setSavedStatus(text) {
   var undo = el("button", {
     type: "button",
     className: "toggle",
-    textContent: "Deshacer último cambio",
-    title: "Restaura la configuración guardada antes de este cambio",
+    textContent: L("Deshacer último cambio", "Undo last change"),
+    title: L("Restaura la configuración guardada antes de este cambio", "Restores the configuration saved before this change"),
     onclick: function () { doUndo(undo); }
   });
   node.append(undo);
@@ -244,12 +244,12 @@ function setSavedStatus(text) {
     type: "button",
     className: "toggle",
     textContent: "✕",
-    title: "Ocultar",
-    attrs: { "aria-label": "Ocultar aviso de guardado" },
+    title: L("Ocultar", "Hide"),
+    attrs: { "aria-label": L("Ocultar aviso de guardado", "Hide save notice") },
     onclick: function () {
       node.replaceChildren();
       dirty = false;
-      setStatus("Hay cambios sin guardar.", "warn");
+      setStatus(L("Hay cambios sin guardar.", "Unsaved changes."), "warn");
       if (!pendingChanges()) setStatus("", "");
     }
   });
@@ -264,7 +264,7 @@ function pendingChanges() {
 
 async function doUndo(button) {
   if (button) button.disabled = true;
-  setStatus("Deshaciendo…");
+  setStatus(L("Deshaciendo…", "Undoing…"));
   try {
     var result = await post("/undo", {});
     state = result.routing;
@@ -272,14 +272,14 @@ async function doUndo(button) {
     routingRevision = result.revision || "absent";
     dirty = false;
     renderAll();
-    setStatus("Último cambio deshecho.", "ok");
+    setStatus(L("Último cambio deshecho.", "Last change undone."), "ok");
   } catch (error) {
-    setStatus("No se pudo deshacer: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo deshacer: ", "Could not undo: ") + (error.serverError || error.message), "err");
   }
 }
 
 async function doSave(force) {
-  setStatus("Guardando…");
+  setStatus(L("Guardando…", "Saving…"));
   var body = cloneConfig(state);
   if (!force) body.baseRevision = routingRevision;
   try {
@@ -289,7 +289,7 @@ async function doSave(force) {
     routingRevision = result.revision || "absent";
     dirty = false;
     renderAll();
-    setSavedStatus(result.applied ? "Guardado y aplicado a la sesión." : "Guardado.");
+    setSavedStatus(result.applied ? L("Guardado y aplicado a la sesión.", "Saved and applied to the session.") : L("Guardado.", "Saved."));
   } catch (error) {
     if (error.status === 412 && error.payload && error.payload.routing) {
       // El servidor rechazó escribir: adopta la revisión en disco como base
@@ -297,47 +297,47 @@ async function doSave(force) {
       savedRouting = cloneConfig(error.payload.routing);
       routingRevision = error.payload.revision || "absent";
       openConflictModal();
-      setStatus("Conflicto: otra ventana guardó antes.", "err");
+      setStatus(L("Conflicto: otra ventana guardó antes.", "Conflict: another window saved first."), "err");
       return;
     }
-    setStatus("No se pudo guardar: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo guardar: ", "Could not save: ") + (error.serverError || error.message), "err");
   }
 }
 
 async function doReset() {
-  setStatus("Calculando diferencias…");
+  setStatus(L("Calculando diferencias…", "Calculating differences…"));
   var defaults;
   try {
     defaults = (await (await fetch("/defaults")).json()).routing;
   } catch (error) {
-    setStatus("No se pudieron leer los valores por defecto: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudieron leer los valores por defecto: ", "Could not read the default values: ") + (error.serverError || error.message), "err");
     return;
   }
   var rows = diffRoutingRows(state, defaults);
   openReviewModal(rows, {
-    title: "Restaurar valores por defecto",
-    warning: "Esto reemplaza TODA la configuración por los valores por defecto del catálogo detectado. Podrás deshacerlo una vez.",
-    confirmText: "Restaurar",
+    title: L("Restaurar valores por defecto", "Restore default values"),
+    warning: L("Esto reemplaza TODA la configuración por los valores por defecto del catálogo detectado. Podrás deshacerlo una vez.", "This replaces ALL configuration with the detected catalog's defaults. You can undo it once."),
+    confirmText: L("Restaurar", "Restore"),
     onConfirm: function () {
       var body = {};
       body.baseRevision = routingRevision;
-      setStatus("Restaurando…");
+      setStatus(L("Restaurando…", "Restoring…"));
       post("/reset", body).then(function (result) {
         state = result.routing;
         savedRouting = cloneConfig(result.routing);
         routingRevision = result.revision || "absent";
         dirty = false;
         renderAll();
-        setSavedStatus("Valores por defecto restaurados.");
+        setSavedStatus(L("Valores por defecto restaurados.", "Default values restored."));
       }).catch(function (error) {
         if (error.status === 412 && error.payload && error.payload.routing) {
           savedRouting = cloneConfig(error.payload.routing);
           routingRevision = error.payload.revision || "absent";
           openConflictModal();
-          setStatus("Conflicto: otra ventana guardó antes.", "err");
+          setStatus(L("Conflicto: otra ventana guardó antes.", "Conflict: another window saved first."), "err");
           return;
         }
-        setStatus("No se pudo restaurar: " + (error.serverError || error.message), "err");
+        setStatus(L("No se pudo restaurar: ", "Could not restore: ") + (error.serverError || error.message), "err");
       });
     }
   });
@@ -345,7 +345,7 @@ async function doReset() {
 
 function applyRouting() {
   var rows = diffRoutingRows(savedRouting, state);
-  openReviewModal(rows, { title: "Revisar cambios", confirmText: "Aplicar", onConfirm: function () { doSave(false); } });
+  openReviewModal(rows, { title: L("Revisar cambios", "Review changes"), confirmText: L("Aplicar", "Apply"), onConfirm: function () { doSave(false); } });
 }
 
 function resetRouting() {
@@ -353,7 +353,7 @@ function resetRouting() {
 }
 
 async function refreshData() {
-  setStatus("Actualizando catálogo y datos públicos…");
+  setStatus(L("Actualizando catálogo y datos públicos…", "Updating catalog and public data…"));
   try {
     var payload = await (await fetch("/catalog?refresh=1")).json();
     if (payload.catalog) {
@@ -367,16 +367,16 @@ async function refreshData() {
     if (data.source) benchSource = data.source;
     sceneSignature = null;
     if (three) disposeScene();
-    setStatus("Datos actualizados.", "ok");
+    setStatus(L("Datos actualizados.", "Data updated."), "ok");
     renderAll();
   } catch (error) {
-    setStatus("No se pudo actualizar: " + (error.serverError || error.message), "err");
+    setStatus(L("No se pudo actualizar: ", "Could not update: ") + (error.serverError || error.message), "err");
   }
 }
 
 async function refreshCatalog() {
   var status = document.getElementById("catalogRefreshStatus");
-  status.textContent = "Refreshing session model list…";
+  status.textContent = L("Actualizando la lista de modelos de la sesión…", "Updating the session's model list…");
   status.dataset.tone = "";
   try {
     var response = await fetch("/catalog?refresh=1");
@@ -386,12 +386,12 @@ async function refreshCatalog() {
     catalogDiagnostics = payload.diagnostics || {};
     catalog = catalogGroups(catalogSnapshot);
     status.textContent = catalogSnapshot.source === "live"
-      ? "Session model list refreshed."
-      : "Refresh completed, but only the fallback catalog is available.";
+      ? L("Lista de modelos actualizada.", "Model list updated.")
+      : L("Actualización terminada, pero solo hay disponible el catálogo de respaldo.", "Update finished, but only the fallback catalog is available.");
     status.dataset.tone = catalogSnapshot.source === "live" ? "ok" : "warn";
     renderAll();
   } catch (error) {
-    status.textContent = "Could not refresh model list: " + error.message;
+    status.textContent = L("No se pudo actualizar la lista de modelos: ", "Could not update the model list: ") + error.message;
     status.dataset.tone = "err";
   }
 }

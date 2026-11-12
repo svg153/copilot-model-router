@@ -63,8 +63,8 @@ function buildScene(THREE) {
       className: "small muted",
       style: { padding: "16px" },
       textContent: onlyMine
-        ? "Ninguno de los modelos que puedes elegir tiene nota global ni una estimación por familia. Quita el botón Solo mis modelos para ver todo el campo público."
-        : "Ninguna esfera pasa los filtros del mapa 3D. Prueba a activar las esferas sin precio, las estimadas o a soltar el filtro de fabricante."
+        ? L("Ninguno de los modelos que puedes elegir tiene nota global ni una estimación por familia. Quita el botón Solo mis modelos para ver todo el campo público.", "None of the models you can choose has an overall score or a family estimate. Turn off the Only my models button to see the whole public field.")
+        : L("Ninguna esfera pasa los filtros del mapa 3D. Prueba a activar las esferas sin precio, las estimadas o a soltar el filtro de fabricante.", "No sphere passes the 3D map filters. Try enabling unpriced or estimated spheres, or clearing the vendor filter.")
     }));
     return null;
   }
@@ -167,9 +167,9 @@ function buildScene(THREE) {
   var radius = sphereSize * 1.15;
 
   var AXIS = {
-    x: { hex: 0xf0a000, css: "#a86a00", title: "Precio (log) →" },
-    y: { hex: 0x1a9c4a, css: "#157f3c", title: "↑ Nota global" },
-    z: { hex: 0x2f7ae5, css: "#2461b8", title: "Velocidad (tok/s) →" }
+    x: { hex: 0xf0a000, css: "#a86a00", title: L("Precio (log) →", "Price (log) →") },
+    y: { hex: 0x1a9c4a, css: "#157f3c", title: L("↑ Nota global", "↑ Overall score") },
+    z: { hex: 0x2f7ae5, css: "#2461b8", title: L("Velocidad (tok/s) →", "Speed (tok/s) →") }
   };
   var LABEL_H = sphereSize * 0.052;
   var LABEL_FONT = "600 44px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -287,7 +287,7 @@ function buildScene(THREE) {
     laneLine.material.depthWrite = false;
     frame.add(laneLine);
 
-    var laneLabel = makeLabel("sin precio público", "#59636e", LABEL_H * 1.05);
+    var laneLabel = makeLabel(L("sin precio público", "no public price"), "#59636e", LABEL_H * 1.05);
     laneLabel.position.set(laneX, laneBottom - LABEL_H, laneZ);
     frame.add(laneLabel);
   }
@@ -338,7 +338,7 @@ function buildScene(THREE) {
       tip.style.left = Math.min(event.clientX - rect.left + 12, rect.width - 250) + "px";
       tip.style.top = Math.max(event.clientY - rect.top - 8, 4) + "px";
       tip.textContent = point.label + " — " + point.vendor +
-        " · global " + point.total.toFixed(1) +
+        " · " + L("global ", "overall ") + point.total.toFixed(1) +
         (point.cost === null ? "" : " · " + money(point.cost) + "/1M") +
         (point.speed === null ? "" : " · " + Math.round(point.speed) + " tok/s");
     } else {
@@ -391,12 +391,12 @@ function buildScene(THREE) {
   var dimmed = points.filter(function (point) { return point.dim; }).length;
   var status = document.getElementById("sceneStatus");
   if (status) {
-    status.textContent = points.length + " esferas" +
-      (onlyMine ? " (solo las que puedes elegir)" : " (todo el campo público)") +
-      " · " + highlighted + " con halo" +
-      (dimmed ? " · " + dimmed + " atenuadas por el filtro de arriba" : "") +
-      (sceneVendors ? " · " + Object.keys(sceneVendors).length + " fabricante(s)" : "") +
-      (unpricedCount ? " · " + unpricedCount + " sin precio público (huecas, en su carril)" : "");
+    status.textContent = points.length + L(" esferas", " spheres") +
+      (onlyMine ? L(" (solo las que puedes elegir)", " (only the ones you can choose)") : L(" (todo el campo público)", " (the whole public field)")) +
+      " · " + highlighted + L(" con halo", " with halo") +
+      (dimmed ? " · " + dimmed + L(" atenuadas por el filtro de arriba", " dimmed by the filter above") : "") +
+      (sceneVendors ? " · " + Object.keys(sceneVendors).length + L(" fabricante(s)", " vendor(s)") : "") +
+      (unpricedCount ? " · " + unpricedCount + L(" sin precio público (huecas, en su carril)", " with no public price (hollow, in their lane)") : "");
   }
 
   updateCamera();
@@ -435,12 +435,12 @@ async function ensureScene() {
     sceneSignature = signature;
     if (!three) {
       sceneFailedFor = signature;
-      sceneMessage("No hay datos de benchmark suficientes para dibujar el mapa.");
+      sceneMessage(L("No hay datos de benchmark suficientes para dibujar el mapa.", "Not enough benchmark data to draw the map."));
     }
   } catch (error) {
     sceneFailedFor = signature;
-    sceneMessage("No se pudo cargar el visor 3D (" + (error && error.message ? error.message : "error desconocido") +
-      "). La pestaña Comparativa tiene exactamente los mismos datos.");
+    sceneMessage(L("No se pudo cargar el visor 3D (", "Could not load the 3D viewer (") + (error && error.message ? error.message : L("error desconocido", "unknown error")) +
+      L("). La pestaña Comparativa tiene exactamente los mismos datos.", "). The Comparison tab has exactly the same data."));
   }
 }
 
@@ -486,7 +486,7 @@ function renderSceneLegend() {
   var names = Object.keys(vendors).sort();
   if (sceneVendors) {
     legend.append(el("button", {
-      className: "toggle", type: "button", textContent: "Todos los fabricantes",
+      className: "toggle", type: "button", textContent: L("Todos los fabricantes", "All vendors"),
       onclick: function () { sceneVendors = null; renderFiltered(); }
     }));
   }
@@ -496,7 +496,7 @@ function renderSceneLegend() {
       className: "toggle",
       type: "button",
       attrs: { "aria-pressed": on ? "true" : "false" },
-      title: "Mostrar u ocultar " + vendor,
+      title: L("Mostrar u ocultar ", "Show or hide ") + vendor,
       onclick: function () { toggleSceneVendor(vendor); }
     }, [
       el("span", { className: "swatch", style: { background: vendorColor(vendor) } }),
@@ -507,13 +507,13 @@ function renderSceneLegend() {
   var unpriced = points.filter(function (point) { return point.cost === null; }).length;
   legend.append(el("span", {
     className: "tiny",
-    textContent: points.length + " esferas en pantalla · " + highlighted + " resaltadas con halo" +
-      (filterActive() ? " (" + activeModels().length + " pasan el filtro de arriba)" : "")
+    textContent: points.length + L(" esferas en pantalla · ", " spheres on screen · ") + highlighted + L(" resaltadas con halo", " highlighted with halo") +
+      (filterActive() ? " (" + activeModels().length + L(" pasan el filtro de arriba)", " pass the filter above)") : "")
   }));
   if (unpriced) {
     legend.append(el("span", {
       className: "tiny",
-      textContent: unpriced + " esferas huecas: sin precio público, fuera del eje X"
+      textContent: unpriced + L(" esferas huecas: sin precio público, fuera del eje X", " hollow spheres: no public price, off the X axis")
     }));
   }
   syncSceneButtons();
@@ -525,9 +525,9 @@ function renderAxisKey() {
   if (!host) return;
   clear("sceneAxes");
   [
-    ["#c07800", "x · Precio", "izquierda barato → derecha caro, en escala logarítmica"],
-    ["#157f3c", "y · Nota global", "abajo el peor modelo medido → arriba el mejor (escala 0–100)"],
-    ["#2461b8", "z · Velocidad", "fondo lento → frente rápido, en tokens por segundo"]
+    ["#c07800", L("x · Precio", "x · Price"), L("izquierda barato → derecha caro, en escala logarítmica", "cheap on the left → expensive on the right, log scale")],
+    ["#157f3c", L("y · Nota global", "y · Overall score"), L("abajo el peor modelo medido → arriba el mejor (escala 0–100)", "worst measured model at the bottom → best at the top (0–100 scale)")],
+    ["#2461b8", L("z · Velocidad", "z · Speed"), L("fondo lento → frente rápido, en tokens por segundo", "slow at the back → fast at the front, in tokens per second")]
   ].forEach(function (axis) {
     host.append(el("span", null, [
       el("span", { className: "swatch", style: { background: axis[0] } }),

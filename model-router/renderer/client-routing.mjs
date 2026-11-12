@@ -1,27 +1,50 @@
 // Client section "routing tab" (split from renderer.mjs, issue #13).
 export const CLIENT_ROUTING = String.raw`// --- routing tab ------------------------------------------------------------
 
-function modelSelect(current, onChange) {
-  var select = el("select", { onchange: function (event) { onChange(event.target.value); } });
-  catalog.forEach(function (group) {
-    var optgroup = el("optgroup", { label: group.label + (group.id === "copilot" ? "" : " (clave propia)") });
-    group.models.forEach(function (model) {
-      // El tercer campo es el TIER de coste, no el esfuerzo: se etiqueta como
-      // "coste:" para que no se confunda con los niveles del desplegable contiguo.
-      var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
-      var option = el("option", {
-        value: model.id,
-        textContent: model.label + "  ·  " + vendorOf(model) + "  ·  " + cost
-      });
-      if (model.id === current) option.selected = true;
-      optgroup.append(option);
-    });
-    select.append(optgroup);
+/** Model IDs currently pinned to a role or subagent; they head the picker. */
+function modelPickedIds() {
+  var ids = [];
+  var roles = state.roles || {};
+  ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
+    var m = roles[role] && roles[role].model;
+    if (m && !ids.includes(m)) ids.push(m);
   });
-  if (current && !hasModel(current)) {
-    select.prepend(el("option", { value: current, textContent: current + " (no está en el catálogo)", selected: true }));
-  }
-  return select;
+  var agents = (state.subagents && state.subagents.agents) || {};
+  Object.keys(agents).forEach(function (type) {
+    var m = agents[type] && agents[type].model;
+    if (m && !ids.includes(m)) ids.push(m);
+  });
+  return ids;
+}
+
+/**
+ * Disparador compacto del selector de modelo: en vez de un <select> con
+ * cientos de opciones, un botón con el modelo actual que abre un modal
+ * buscador (openModelPicker, modo único). El título muestra el ID completo.
+ */
+function modelSelect(current, onChange) {
+  var model = current ? findModel(current) : null;
+  var text = !current ? L("(sin fijar)", "(not pinned)")
+    : model ? model.label + "  ·  " + vendorOf(model)
+    : current + "  ·  " + L("(no está en el catálogo)", "(not in the catalog)");
+  return el("button", {
+    type: "button",
+    className: "mpk" + (current ? "" : " mpk-empty"),
+    title: current ? current : L("Elegir un modelo", "Choose a model"),
+    attrs: { "aria-haspopup": "dialog" },
+    onclick: function () {
+      openModelPicker({
+        title: L("Elegir modelo", "Choose model"),
+        single: true,
+        current: current,
+        getList: function () { return [current]; },
+        onPick: function (id) { onChange(id); }
+      });
+    }
+  }, [
+    el("span", { className: "mpk-label", textContent: text }),
+    el("span", { className: "mpk-caret", textContent: "▾", attrs: { "aria-hidden": "true" } })
+  ]);
 }
 
 function selectFrom(values, current, onChange) {
@@ -32,91 +55,182 @@ function selectFrom(values, current, onChange) {
     if (value === current) { option.selected = true; found = true; }
     select.append(option);
   });
-  if (!found) select.prepend(el("option", { value: "", textContent: "(sin definir)", selected: true }));
+  if (!found) select.prepend(el("option", { value: "", textContent: L("(sin definir)", "(not defined)"), selected: true }));
   return select;
 }
 
-// --- fallback picker ---------------------------------------------------------
+// --- model picker ------------------------------------------------------------
 
 /**
- * Modal para elegir modelos de fallback: catálogo completo agrupado por
- * proveedor (sin buscador). Un clic añade el modelo; clic en uno ya añadido
- * lo quita (aria-pressed). Se cierra con ✕, pulsando el fondo o ESC, y
- * devuelve el foco al disparador. Trampa de foco con Tab.
+ * Modal de elección de modelos con buscador, agrupado por proveedor y con el
+ * grupo «Mis fijados» delante (los modelos ya fijados en la config). Dos modos:
+ *  - múltiple (fallbacks): getList/onAdd/onRemove; un clic añade, otro quita.
+ *  - único (fijar modelo): single + onPick; un clic elige, marca ✓ y cierra.
+ * El buscador filtra por nombre, ID exacto, fabricante y proveedor. Se cierra
+ * con ✕, fondo o ESC, y devuelve el foco al disparador. Trampa de foco con Tab.
  */
-function openFallbackPicker(titleText, getList, onAdd, onRemove) {
+function openModelPicker(opts) {
+  var single = !!opts.single;
+  var getList = opts.getList || function () { return []; };
   var rows = [];
+  var groups = [];
   var lastFocus = null;
   try { lastFocus = document.activeElement; } catch (_) {}
-  var refresh = function () {
-    var cur = getList();
-    rows.forEach(function (r) {
-      var on = cur.includes(r.id);
-      r.mark.textContent = on ? "✓" : "";
-      r.row.className = "fb-opt" + (on ? " fb-on" : "");
-      r.row.setAttribute("aria-pressed", on ? "true" : "false");
-      r.row.title = on ? "Quitar " + r.id + " del fallback" : "Añadir " + r.id + " al fallback";
-    });
+
+  var onKey = function (event) {
+    if (event.key === "Escape") { detach(); return; }
+    if (event.key !== "Tab") return;
+    var f = modal.querySelectorAll("button, input");
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
   var detach = function () {
     try { document.removeEventListener("keydown", onKey); } catch (_) {}
     try { if (back.parentNode) back.parentNode.removeChild(back); } catch (_) { back.style.display = "none"; }
     try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (_) {}
   };
-  var onKey = function (event) {
-    if (event.key === "Escape") { detach(); return; }
-    if (event.key !== "Tab") return;
-    var f = modal.querySelectorAll("button");
-    if (!f.length) return;
-    var first = f[0], last = f[f.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  };
 
   var back = el("div", { className: "fb-backdrop", onclick: function (event) { if (event.target === back) detach(); } });
   var modal = el("div", {
     className: "fb-modal",
-    attrs: { role: "dialog", "aria-modal": "true", "aria-label": titleText }
+    attrs: { role: "dialog", "aria-modal": "true", "aria-label": opts.title }
   });
-  var head = el("div", { className: "fb-modal-head" }, [
-    el("strong", { className: "fb-modal-title", textContent: titleText }),
-    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar catálogo" }, onclick: detach })
-  ]);
-  modal.append(head);
-  catalog.forEach(function (group) {
-    modal.append(el("div", { className: "fb-group", textContent: group.label + (group.id === "copilot" ? "" : " (clave propia)") }));
-    group.models.forEach(function (model) {
-      var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
-      var mark = el("span", { className: "fb-mark", textContent: "" });
-      var row = el("button", {
-        type: "button",
-        className: "fb-opt",
-        attrs: { "aria-pressed": "false" },
-        onclick: function () {
-          var cur = getList();
-          if (cur.includes(model.id)) { if (onRemove) onRemove(model.id); }
-          else { onAdd(model.id); }
-          refresh();
-        }
-      }, [
-        el("span", { className: "fb-opt-name", textContent: model.label }),
-        el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
-        mark
-      ]);
-      rows.push({ id: model.id, mark: mark, row: row });
-      modal.append(row);
+  modal.append(el("div", { className: "fb-modal-head" }, [
+    el("strong", { className: "fb-modal-title", textContent: opts.title }),
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: L("Cerrar", "Close"), attrs: { "aria-label": L("Cerrar catálogo", "Close catalog") }, onclick: detach })
+  ]));
+  var count = el("span", { className: "fb-count" });
+  var search = el("input", {
+    type: "text",
+    placeholder: L("Buscar por nombre, ID o fabricante…", "Search by name, ID, or vendor…"),
+    attrs: { "aria-label": L("Buscar modelos", "Search models") }
+  });
+  modal.append(el("div", { className: "fb-search" }, [search, count]));
+
+  var refreshMarks = function () {
+    var cur = getList();
+    rows.forEach(function (r) {
+      var on = cur.includes(r.id);
+      r.mark.textContent = on ? "✓" : "";
+      if (on) r.row.classList.add("fb-on"); else r.row.classList.remove("fb-on");
+      if (!single) {
+        r.row.setAttribute("aria-pressed", on ? "true" : "false");
+        r.row.title = on ? L("Quitar ", "Remove ") + r.id + L(" del fallback", " from the fallback") : L("Añadir ", "Add ") + r.id + L(" al fallback", " to the fallback");
+      }
     });
+  };
+
+  var addGroup = function (titleText) {
+    var g = el("div", { className: "fb-group", textContent: titleText });
+    g._rows = [];
+    g._hay = titleText.toLowerCase();
+    modal.append(g);
+    groups.push(g);
+    return g;
+  };
+  var addRow = function (model, g) {
+    // El meta muestra fabricante y TIER de coste (no esfuerzo), nunca el
+    // ID abreviado: va en su propia línea mono para poder verificarlo.
+    var cost = model.tier === "byok" ? L("coste externo", "external cost") : L("coste ", "cost ") + (TIER_LABEL[model.tier] || "?");
+    var mark = el("span", { className: "fb-mark", textContent: "" });
+    var row = el("button", {
+      type: "button",
+      className: "fb-opt",
+      title: model.id,
+      attrs: single ? {} : { "aria-pressed": "false" },
+      onclick: function () {
+        if (single) { opts.onPick(model.id); detach(); return; }
+        if (getList().includes(model.id)) { if (opts.onRemove) opts.onRemove(model.id); }
+        else { opts.onAdd(model.id); }
+        refreshMarks();
+      }
+    }, [
+      el("span", { className: "fb-opt-main" }, [
+        el("span", { className: "fb-opt-name", textContent: model.label }),
+        el("span", { className: "fb-opt-id mono", textContent: model.id })
+      ]),
+      el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
+      mark
+    ]);
+    var entry = {
+      id: model.id, row: row, mark: mark, group: g,
+      hay: (model.label + " " + model.id + " " + vendorOf(model) + " " + g._hay).toLowerCase()
+    };
+    rows.push(entry);
+    g._rows.push(entry);
+    modal.append(row);
+  };
+
+  var pinnedIds = modelPickedIds();
+  var byId = {};
+  allModels().forEach(function (m) { byId[m.id] = m; });
+  var inPinned = {};
+  if (pinnedIds.length) {
+    var pg = addGroup(L("Mis fijados", "My pinned"));
+    pinnedIds.forEach(function (id) {
+      var m = byId[id];
+      if (!m) return;
+      inPinned[id] = true;
+      addRow(m, pg);
+    });
+    if (!pg._rows.length) modal.removeChild(pg);
+  }
+  catalog.forEach(function (group) {
+    var g = addGroup(group.label + (group.id === "copilot" ? "" : L(" (clave propia)", " (own key)")));
+    group.models.forEach(function (model) {
+      if (inPinned[model.id]) return;
+      addRow(model, g);
+    });
+    if (!g._rows.length) modal.removeChild(g);
   });
-  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: "No hay modelos en el catálogo. Recarga con el botón «Refrescar»." }));
+  groups = groups.filter(function (g) { return g.parentNode; });
+  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: L("No hay modelos en el catálogo. Recarga con el botón «Actualizar modelos».", "No models in the catalog. Reload with the «Update models» button.") }));
+
+  var applyFilter = function () {
+    var q = search.value.trim().toLowerCase();
+    var shown = 0;
+    rows.forEach(function (r) {
+      var hit = !q || r.hay.includes(q);
+      if (hit) r.row.classList.remove("fb-hide"); else r.row.classList.add("fb-hide");
+      if (hit) shown++;
+    });
+    groups.forEach(function (g) {
+      var any = g._rows.some(function (r) { return r.hay.includes(q); });
+      if (any) g.classList.remove("fb-hide"); else g.classList.add("fb-hide");
+    });
+    count.textContent = rows.length
+      ? (shown === rows.length ? rows.length + (rows.length === 1 ? L(" modelo", " model") : L(" modelos", " models")) : shown + L(" de ", " of ") + rows.length)
+      : "";
+  };
+  search.oninput = applyFilter;
+
+  if (single && opts.current) {
+    modal.append(el("div", { className: "fb-foot" }, [
+      el("button", {
+        type: "button", className: "toggle",
+        textContent: L("Quitar el fijado (dejar sin modelo)", "Remove the pin (leave without a model)"),
+        onclick: function () { opts.onPick(""); detach(); }
+      })
+    ]));
+  }
+
   back.append(modal);
   document.body.append(back);
   try { document.addEventListener("keydown", onKey); } catch (_) {}
-  refresh();
+  refreshMarks();
+  applyFilter();
   try {
-    var focusTarget = modal.querySelector(".fb-opt") || modal.querySelector(".fb-modal-close");
-    if (focusTarget && focusTarget.focus) focusTarget.focus();
+    if (rows.length) { search.focus(); }
+    else { var t = modal.querySelector(".fb-modal-close"); if (t) t.focus(); }
   } catch (_) {}
   return detach;
+}
+
+/** Compat: apertura del picker en modo múltiple para cadenas de fallback. */
+function openFallbackPicker(titleText, getList, onAdd, onRemove) {
+  return openModelPicker({ title: titleText, getList: getList, onAdd: onAdd, onRemove: onRemove });
 }
 
 /**
@@ -129,9 +243,9 @@ function fallbackChip(idx, total, id, onMove, onRemove) {
   return el("span", { className: "fb-chip", title: id }, [
     el("b", { className: "fb-pos", textContent: String(idx + 1) }),
     el("span", { className: "fb-name", textContent: name }),
-    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: "Subir en la cadena", attrs: { "aria-label": "Subir " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx - 1); } }) : null,
-    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: "Bajar en la cadena", attrs: { "aria-label": "Bajar " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx + 1); } }) : null,
-    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: "Quitar", attrs: { "aria-label": "Quitar " + name + " del fallback" }, onclick: onRemove })
+    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: L("Subir en la cadena", "Move up the chain"), attrs: { "aria-label": L("Subir ", "Move up ") + name + L(" en la cadena de fallback", " in the fallback chain") }, onclick: function () { onMove(idx, idx - 1); } }) : null,
+    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: L("Bajar en la cadena", "Move down the chain"), attrs: { "aria-label": L("Bajar ", "Move down ") + name + L(" en la cadena de fallback", " in the fallback chain") }, onclick: function () { onMove(idx, idx + 1); } }) : null,
+    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: L("Quitar", "Remove"), attrs: { "aria-label": L("Quitar ", "Remove ") + name + L(" del fallback", " from the fallback") }, onclick: onRemove })
   ]);
 }
 
@@ -155,10 +269,10 @@ function fallbackRow(labelWidth, host, getList, render, updater) {
   wrap.append(el("button", {
     type: "button",
     className: "fb-add",
-    textContent: list.length ? "+ añadir" : "+ elegir modelos",
-    title: "Abrir el catálogo para elegir modelos de fallback",
+    textContent: list.length ? L("+ añadir", "+ add") : L("+ elegir modelos", "+ choose models"),
+    title: L("Abrir el catálogo para elegir modelos de fallback", "Open the catalog to choose fallback models"),
     onclick: function () {
-      openFallbackPicker("Modelos de fallback", getList, function (id) {
+      openFallbackPicker(L("Modelos de fallback", "Fallback models"), getList, function (id) {
         updater(getList().concat([id]));
         render();
       }, function (id) {
@@ -215,10 +329,10 @@ function renderSubagents() {
   var agents = (state.subagents && state.subagents.agents) || {};
 
   var head = el("div", { className: "meter", style: { gridTemplateColumns: "150px minmax(0, 2.2fr) 92px 118px" } }, [
-    el("span", { className: "tiny muted", textContent: "Subagente" }),
-    el("span", { className: "tiny muted", textContent: "Modelo fijado" }),
-    el("span", { className: "tiny muted", textContent: "Esfuerzo" }),
-    el("span", { className: "tiny muted", textContent: "Exigencia" })
+    el("span", { className: "tiny muted", textContent: L("Subagente", "Subagent") }),
+    el("span", { className: "tiny muted", textContent: L("Modelo fijado", "Pinned model") }),
+    el("span", { className: "tiny muted", textContent: L("Esfuerzo", "Effort") }),
+    el("span", { className: "tiny muted", textContent: L("Exigencia", "Requirement") })
   ]);
   host.append(head);
 
@@ -298,14 +412,14 @@ function defs(hostId, entries) {
 
 function renderRoutingDefs() {
   defs("routingDefs", [
-    ["Modelo", "Qué modelo atiende ese papel. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
-    ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: " +
+    [L("Modelo", "Model"), L("Qué modelo atiende ese papel. El botón abre un buscador sobre el catálogo: escribe nombre, ID o fabricante, y el grupo «Mis fijados» coloca delante los modelos que ya usas en otra fila. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte.", "Which model serves that role. The button opens a search over the catalog: type a name, ID, or vendor, and the «My pinned» group surfaces the models you already use in another row. Copilot plan models consume your quota; own-key models are billed separately.")],
+    [L("Esfuerzo", "Effort") + " (effort)", L("Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: ", "How much compute time the model spends thinking before answering. Raising it improves hard problems and raises the cost of each call; lowering it answers sooner and spends less. The dropdown only offers the levels the chosen model supports; if you change models and the saved level is no longer valid, it is left undefined. Global levels: ") +
       effortLevels.join(" · ") + "."],
-    ["Fallback", "Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo (agrupado por proveedor): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden."],
-    ["Exigencia (modelPolicy) — required", "El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium."],
-    ["Exigencia (modelPolicy) — preferred", "El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla."],
-    ["Exigencia (modelPolicy) — inherit", "Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción."],
-    ["maxConcurrency", "Cuántos subagentes pueden ejecutarse a la vez. Más alto termina antes y dispara el gasto; más bajo es más barato y más lento."]
+    ["Fallback", L("Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo con buscador (agrupado por proveedor, con «Mis fijados» delante): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden.", "List of secondary models, in attempt order. Press «+ add» to open the searchable catalog (grouped by provider, with «My pinned» first): one click adds the model to the end of the chain and a ✓ marks those already present; ✕, ESC, or clicking the backdrop closes the modal. On the chips, the ↑↓ arrows change the order and ✕ removes. If the primary model is unavailable, the runtime tries the ones in this list in order.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy) — required", L("El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium.", "The pinned model is mandatory. If someone requests another model for that subagent, it is rejected. This is what stops a loose call from escalating to a premium model.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy) — preferred", L("El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla.", "The pinned model is only the default: an explicit request for another model wins. Use it when you want a suggestion, not a rule.")],
+    [L("Exigencia", "Requirement") + " (modelPolicy) — inherit", L("Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción.", "No opinion of its own: whatever the runtime has configured applies. This is the value written when you choose this option.")],
+    ["maxConcurrency", L("Cuántos subagentes pueden ejecutarse a la vez. Más alto termina antes y dispara el gasto; más bajo es más barato y más lento.", "How many subagents can run at once. Higher finishes sooner and spikes spend; lower is cheaper and slower.")]
   ]);
 }
 `;
