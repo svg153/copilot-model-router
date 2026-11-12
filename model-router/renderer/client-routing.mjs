@@ -40,26 +40,47 @@ function selectFrom(values, current, onChange) {
 
 /**
  * Modal para elegir modelos de fallback: catálogo completo agrupado por
- * proveedor (sin buscador). Un clic añade el modelo al final de la cadena;
- * los ya añadidos se marcan con ✓. Se cierra con ✕, pulsando el fondo o ESC.
+ * proveedor (sin buscador). Un clic añade el modelo; clic en uno ya añadido
+ * lo quita (aria-pressed). Se cierra con ✕, pulsando el fondo o ESC, y
+ * devuelve el foco al disparador. Trampa de foco con Tab.
  */
-function openFallbackPicker(titleText, getList, onPick) {
+function openFallbackPicker(titleText, getList, onAdd, onRemove) {
   var rows = [];
+  var lastFocus = null;
+  try { lastFocus = document.activeElement; } catch (_) {}
   var refresh = function () {
     var cur = getList();
-    rows.forEach(function (r) { r.mark.textContent = cur.includes(r.id) ? "✓" : ""; });
+    rows.forEach(function (r) {
+      var on = cur.includes(r.id);
+      r.mark.textContent = on ? "✓" : "";
+      r.row.className = "fb-opt" + (on ? " fb-on" : "");
+      r.row.setAttribute("aria-pressed", on ? "true" : "false");
+      r.row.title = on ? "Quitar " + r.id + " del fallback" : "Añadir " + r.id + " al fallback";
+    });
   };
   var detach = function () {
     try { document.removeEventListener("keydown", onKey); } catch (_) {}
     try { if (back.parentNode) back.parentNode.removeChild(back); } catch (_) { back.style.display = "none"; }
+    try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (_) {}
   };
-  var onKey = function (event) { if (event.key === "Escape") detach(); };
+  var onKey = function (event) {
+    if (event.key === "Escape") { detach(); return; }
+    if (event.key !== "Tab") return;
+    var f = modal.querySelectorAll("button");
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  };
 
   var back = el("div", { className: "fb-backdrop", onclick: function (event) { if (event.target === back) detach(); } });
-  var modal = el("div", { className: "fb-modal" });
+  var modal = el("div", {
+    className: "fb-modal",
+    attrs: { role: "dialog", "aria-modal": "true", "aria-label": titleText }
+  });
   var head = el("div", { className: "fb-modal-head" }, [
     el("strong", { className: "fb-modal-title", textContent: titleText }),
-    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", onclick: detach })
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar catálogo" }, onclick: detach })
   ]);
   modal.append(head);
   catalog.forEach(function (group) {
@@ -70,10 +91,11 @@ function openFallbackPicker(titleText, getList, onPick) {
       var row = el("button", {
         type: "button",
         className: "fb-opt",
+        attrs: { "aria-pressed": "false" },
         onclick: function () {
           var cur = getList();
-          if (cur.includes(model.id)) return;
-          onPick(model.id);
+          if (cur.includes(model.id)) { if (onRemove) onRemove(model.id); }
+          else { onAdd(model.id); }
           refresh();
         }
       }, [
@@ -81,14 +103,19 @@ function openFallbackPicker(titleText, getList, onPick) {
         el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
         mark
       ]);
-      rows.push({ id: model.id, mark: mark });
+      rows.push({ id: model.id, mark: mark, row: row });
       modal.append(row);
     });
   });
+  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: "No hay modelos en el catálogo. Recarga con el botón «Refrescar»." }));
   back.append(modal);
   document.body.append(back);
   try { document.addEventListener("keydown", onKey); } catch (_) {}
   refresh();
+  try {
+    var focusTarget = modal.querySelector(".fb-opt") || modal.querySelector(".fb-modal-close");
+    if (focusTarget && focusTarget.focus) focusTarget.focus();
+  } catch (_) {}
   return detach;
 }
 
@@ -98,12 +125,13 @@ function openFallbackPicker(titleText, getList, onPick) {
  */
 function fallbackChip(idx, total, id, onMove, onRemove) {
   var model = findModel(id);
+  var name = model ? model.label : id;
   return el("span", { className: "fb-chip", title: id }, [
     el("b", { className: "fb-pos", textContent: String(idx + 1) }),
-    el("span", { className: "fb-name", textContent: (model ? model.label : id) }),
-    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: "Subir en la cadena", onclick: function () { onMove(idx, idx - 1); } }) : null,
-    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: "Bajar en la cadena", onclick: function () { onMove(idx, idx + 1); } }) : null,
-    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: "Quitar", onclick: onRemove })
+    el("span", { className: "fb-name", textContent: name }),
+    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: "Subir en la cadena", attrs: { "aria-label": "Subir " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx - 1); } }) : null,
+    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: "Bajar en la cadena", attrs: { "aria-label": "Bajar " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx + 1); } }) : null,
+    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: "Quitar", attrs: { "aria-label": "Quitar " + name + " del fallback" }, onclick: onRemove })
   ]);
 }
 
@@ -132,6 +160,9 @@ function fallbackRow(labelWidth, host, getList, render, updater) {
     onclick: function () {
       openFallbackPicker("Modelos de fallback", getList, function (id) {
         updater(getList().concat([id]));
+        render();
+      }, function (id) {
+        updater(getList().filter(function (x) { return x !== id; }));
         render();
       });
     }
