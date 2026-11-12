@@ -810,6 +810,17 @@ function findModel(id) {
   return null;
 }
 
+/**
+ * Effort levels the given model actually supports. The snapshot carries a
+ * per-model effortOptions list; when it is missing or unknown we must not
+ * pretend to know, so every level stays selectable.
+ */
+function effortOptionsFor(id) {
+  var model = findModel(id);
+  if (model && Array.isArray(model.effortOptions) && model.effortOptions.length) return model.effortOptions;
+  return effortLevels;
+}
+
 function findBenchRow(id) {
   var rows = scoredRows();
   for (var i = 0; i < rows.length; i++) {
@@ -1231,9 +1242,12 @@ function modelSelect(current, onChange) {
   catalog.forEach(function (group) {
     var optgroup = el("optgroup", { label: group.label + (group.id === "copilot" ? "" : " (clave propia)") });
     group.models.forEach(function (model) {
+      // El tercer campo es el TIER de coste, no el esfuerzo: se etiqueta como
+      // "coste:" para que no se confunda con los niveles del desplegable contiguo.
+      var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
       var option = el("option", {
         value: model.id,
-        textContent: model.label + "  ·  " + vendorOf(model) + "  ·  " + (TIER_LABEL[model.tier] || model.tier || "?")
+        textContent: model.label + "  ·  " + vendorOf(model) + "  ·  " + cost
       });
       if (model.id === current) option.selected = true;
       optgroup.append(option);
@@ -1265,10 +1279,14 @@ function renderRoles() {
     var row = el("div", { className: "meter", style: { gridTemplateColumns: "100px minmax(0, 2.2fr) minmax(0, 1fr)" } }, [
       el("strong", { textContent: role }),
       modelSelect(entry.model, function (value) {
-        state.roles[role] = Object.assign({}, state.roles[role], { model: value });
+        var next = Object.assign({}, state.roles[role], { model: value });
+        var options = effortOptionsFor(value);
+        if (next.effort && !options.includes(next.effort)) delete next.effort;
+        state.roles[role] = next;
         markDirty();
+        renderRoles();
       }),
-      selectFrom(effortLevels, entry.effort, function (value) {
+      selectFrom(effortOptionsFor(entry.model), entry.effort, function (value) {
         state.roles[role] = Object.assign({}, state.roles[role], { effort: value });
         markDirty();
       })
@@ -1350,12 +1368,16 @@ function renderSubagents() {
     var row = el("div", { className: "meter", style: { gridTemplateColumns: "150px minmax(0, 2.2fr) 92px 118px" } }, [
       el("span", { className: "mono", textContent: type }),
       modelSelect(entry.model, function (value) {
-        agents[type] = Object.assign({}, entry, { model: value });
+        var next = Object.assign({}, entry, { model: value });
+        var options = effortOptionsFor(value);
+        if (next.effortLevel && !options.includes(next.effortLevel)) delete next.effortLevel;
+        agents[type] = next;
         state.subagents.agents = agents;
         markDirty();
+        renderSubagents();
         renderRecommendations();
       }),
-      selectFrom(effortLevels, entry.effortLevel, function (value) {
+      selectFrom(effortOptionsFor(entry.model), entry.effortLevel, function (value) {
         agents[type] = Object.assign({}, entry, { effortLevel: value });
         state.subagents.agents = agents;
         markDirty();
@@ -1460,7 +1482,7 @@ function defs(hostId, entries) {
 function renderRoutingDefs() {
   defs("routingDefs", [
     ["Modelo", "Qué modelo atiende ese papel. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
-    ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. " +
+    ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: " +
       effortLevels.join(" · ") + "."],
     ["Fallback", "Lista de modelos secundarios. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden. Útil para tener un plan B sin perder control."],
     ["Exigencia (modelPolicy) — required", "El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium."],
