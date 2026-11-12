@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "generatedAt": "2026-11-12T02:58:50.452Z",
+  "generatedAt": "2026-11-12T03:09:22.403Z",
   "algorithm": "sha256",
   "artifacts": {
     "model-router/data/models-enriched.json": {
-      "sha256": "914e15081dc145d5428efff4f5b4000485d5f3e5406e4315cb0c8d8be147ed52",
-      "bytes": 203481
+      "sha256": "05752dfe78103cf19bf6a923b92b2681622a6bc08367dad4cfbcfd988bc63bf2",
+      "bytes": 203573
     },
     "model-router/vendor/three.core.min.js": {
       "sha256": "61ba0df005b05991361d040d8ff670e1aadfd0ce7aeebd1fdb0725957a8957de",
@@ -18,7 +18,7 @@
   },
   "sources": {
     "https://models.dev/api.json": {
-      "sha256": "d1a3042e9988a914a3397b18a04026501d33828c14c125ec3b93492330643c2c"
+      "sha256": "37dfed90997eee79169d661b3813278e73ee1a1dd3c545fc6d6cc58bac221cd8"
     },
     "https://raw.githubusercontent.com/verseles/showdown/aba476b837e06609807a8ef0f1125262a360bdc9/data/showdown.json": {
       "sha256": "52fefbae5bcf6326f89585fce2ad905219db51b76bf47425cfd16339d5d0ffde"
