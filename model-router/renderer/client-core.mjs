@@ -216,6 +216,17 @@ function findModel(id) {
   return null;
 }
 
+/**
+ * Effort levels the given model actually supports. The snapshot carries a
+ * per-model effortOptions list; when it is missing or unknown we must not
+ * pretend to know, so every level stays selectable.
+ */
+function effortOptionsFor(id) {
+  var model = findModel(id);
+  if (model && Array.isArray(model.effortOptions) && model.effortOptions.length) return model.effortOptions;
+  return effortLevels;
+}
+
 function findBenchRow(id) {
   var rows = scoredRows();
   for (var i = 0; i < rows.length; i++) {
