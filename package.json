@@ -1,6 +1,6 @@
 {
   "name": "copilot-model-router",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "Model Router canvas extension + routing policy for GitHub Copilot (zero-dependency ESM).",
   "type": "module",
