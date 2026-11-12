@@ -33,7 +33,15 @@ if (-not (Test-Path $source)) {
 $extensionsDir = Join-Path $CopilotHome "extensions"
 $target = Join-Path $extensionsDir "model-router"
 
-Write-Host "Origen : $source"
+# Release zips ship package.json at their root, so the installed version is
+# reported from the same manifest the release workflow bumps.
+$manifest = Join-Path $PSScriptRoot "package.json"
+$version = "unknown"
+if (Test-Path $manifest) {
+    $version = (Get-Content $manifest -Raw | ConvertFrom-Json).version
+}
+
+Write-Host "Origen : $source (model-router v$version)"
 Write-Host "Destino: $target"
 
 if (Test-Path $target) {
@@ -80,5 +88,5 @@ if ($savedRouting) {
 }
 
 Write-Host ""
-Write-Host "Instalada en $target" -ForegroundColor Green
+Write-Host "Instalada en $target (model-router v$version)" -ForegroundColor Green
 Write-Host "Recarga las extensiones desde la app (o reiníciala) para que se active."

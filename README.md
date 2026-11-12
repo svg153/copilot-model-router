@@ -350,6 +350,24 @@ cd copilot-model-router
 Copia la carpeta `model-router/` dentro de `%USERPROFILE%\.copilot\extensions\`
 (o `$COPILOT_HOME\extensions\` si defines esa variable) y recarga las extensiones.
 
+### Releases
+
+Cada merge a `main` que modifica `model-router/` publica automáticamente una release
+`vX.Y.Z` (workflow `release.yml`): sube la versión de `package.json`, etiqueta el commit
+y adjunta un zip con `model-router/`, `install.ps1` y `package.json`. Para instalar esa
+versión exacta:
+
+```powershell
+$tag = "v1.0.1"  # sustitúyelo por la versión que quieras instalar
+gh release download $tag --repo svg153/copilot-model-router --pattern "*.zip"
+Expand-Archive "model-router-$tag.zip" -DestinationPath release
+cd release
+./install.ps1
+```
+
+`--repo` hace la descarga independiente del directorio de trabajo: funciona
+fuera de un clone y nunca resuelve el repo equivocado.
+
 ## Uso
 
 Abre el panel **Model Router** desde el canvas, cambia lo que quieras y pulsa
