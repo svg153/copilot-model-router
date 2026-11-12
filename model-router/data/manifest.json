@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "generatedAt": "2026-11-09T05:20:54.237Z",
+  "generatedAt": "2026-11-12T02:58:50.452Z",
   "algorithm": "sha256",
   "artifacts": {
     "model-router/data/models-enriched.json": {
-      "sha256": "f8363caa21585151af19857d37f0b7dd9d3d34a35d2ce7931298b744feb92e88",
-      "bytes": 201205
+      "sha256": "914e15081dc145d5428efff4f5b4000485d5f3e5406e4315cb0c8d8be147ed52",
+      "bytes": 203481
     },
     "model-router/vendor/three.core.min.js": {
       "sha256": "61ba0df005b05991361d040d8ff670e1aadfd0ce7aeebd1fdb0725957a8957de",
@@ -18,28 +18,28 @@
   },
   "sources": {
     "https://models.dev/api.json": {
-      "sha256": "5bd7d93bed89275d0a0cbff6bcdfcfd91d309068473e49877e20f6e82c079dde"
+      "sha256": "d1a3042e9988a914a3397b18a04026501d33828c14c125ec3b93492330643c2c"
     },
-    "https://raw.githubusercontent.com/verseles/showdown/ca4749c3d11b15757192af7d8b88b5f97650772d/data/showdown.json": {
+    "https://raw.githubusercontent.com/verseles/showdown/aba476b837e06609807a8ef0f1125262a360bdc9/data/showdown.json": {
       "sha256": "52fefbae5bcf6326f89585fce2ad905219db51b76bf47425cfd16339d5d0ffde"
     },
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/leaderboard/reasonmodel.md": {
-      "sha256": "1cfb97a00f93a7f9018723c190ea4bd85c7a6d7ecfc608fc41604f9c6c967a6d"
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/leaderboard/reasonmodel.md": {
+      "sha256": "97eb65294f810afeb83af2434359868a4209c7f99dce1be3791d5c9f1ad326aa"
     },
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/leaderboard/coding.md": {
-      "sha256": "b0bda27f74881c58032b58515ff3a010c45147cf691d8375cc3a0b7f0f306334"
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/leaderboard/coding.md": {
+      "sha256": "ab664eadd6c808b59142c1b3162186311ee8149c48f4cae6b51d8676f5a5881c"
     },
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/leaderboard/livecodebench.md": {
-      "sha256": "e39fb3644ab89400631131edc7dbcbcea1d3b67047f76c99fc968b6046e9ac97"
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/leaderboard/livecodebench.md": {
+      "sha256": "ed569f3c0ff9b8ba876a6432ef25161f9fe62d322c7bbb39121fea42c12ee7b0"
     },
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/leaderboard/TAU.md": {
-      "sha256": "e85b076f52e8573e418c72318c45b35ec7945c282070029cf7e6d0e1cab83359"
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/leaderboard/TAU.md": {
+      "sha256": "67ce6901fb7dd4e2a5631d8a4d0785c8667d8ad4f1f4ffbd787b2f1c5126b864"
     },
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/leaderboard/Terminal-Bench-2.0.md": {
-      "sha256": "44b2f19da132a81eac9e9b5054a34fc7ac441901b79cf39d6731e822407c8359"
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/leaderboard/Terminal-Bench-2.0.md": {
+      "sha256": "c3fd8edd258e5525fd4203bd2a9d252c9649fb6e7262793cc3fb1e9a159bb80b"
     },
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/leaderboard/agent%E4%B8%8E%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8.md": {
-      "sha256": "9ee82b1eda5836ff70620938f744d0b6808c0a75d557b665b03f7b9be6ba2c94"
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/leaderboard/agent%E4%B8%8E%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8.md": {
+      "sha256": "2b7324a431bc81e53f2ecdcc6049fc59048407d2dbc312fe23e3660080a2740b"
     }
   }
 }

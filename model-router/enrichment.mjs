@@ -120,6 +120,13 @@ function median(values) {
  *
  * Only narrower names are considered. A broader candidate would drag in a whole
  * product line, which says nothing about the specific model being scored.
+ *
+ * When no variant of the exact name is measured either, we widen one last step:
+ * the same family minus its version digits ("gpt-5.6-luna" → "gpt-luna" matches
+ * the measured "gpt-6-luna"). Leaderboards lag behind releases, and a
+ * next-generation sibling is a far better guess than a blank card — but the
+ * note says plainly that it is another generation, so nobody reads it as a
+ * measurement of this model.
  */
 function lookupBench(index, modelId) {
     const bare = String(modelId ?? "").split("/").pop();
@@ -132,6 +139,19 @@ function lookupBench(index, modelId) {
     for (const candidate of index.benchKeys) {
         if (candidate === key) continue;
         if (candidate.startsWith(key)) found.add(candidate);
+    }
+    let crossGeneration = false;
+    if (!found.size) {
+        // Same codename, different version number: drop every digit and compare.
+        // Short stripped keys ("gpt", "qwen") are skipped; they would match the
+        // whole product line rather than one model family.
+        const stripped = key.replace(/\d+/g, "");
+        if (stripped.length >= 6) {
+            for (const candidate of index.benchKeys) {
+                if (candidate.replace(/\d+/g, "") === stripped) found.add(candidate);
+            }
+            crossGeneration = found.size > 0;
+        }
     }
     const candidates = [...found];
     if (!candidates.length) return null;
@@ -150,10 +170,13 @@ function lookupBench(index, modelId) {
 
     return {
         bench,
-        note:
-            candidates.length === 1
-                ? `Estimado a partir de ${entries[0].label || candidates[0]}`
-                : `Mediana de ${candidates.length} variantes de la familia ${bare}`,
+        note: crossGeneration
+            ? candidates.length === 1
+              ? `Estimado a partir de ${entries[0].label || candidates[0]} (otra generación, misma familia)`
+              : `Mediana de ${candidates.length} variantes de otra generación de la familia ${bare}`
+            : candidates.length === 1
+              ? `Estimado a partir de ${entries[0].label || candidates[0]}`
+              : `Mediana de ${candidates.length} variantes de la familia ${bare}`,
     };
 }
 

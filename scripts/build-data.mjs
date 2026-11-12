@@ -44,12 +44,12 @@ function manifestKey(filePath) {
 // replace the SHA below, run `node scripts/build-data.mjs`, and commit the
 // regenerated snapshot together with the new pin.
 const JEINLEE_BASE =
-    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/e1e3d006d853ab355f49f5322e6548ad5a566645/";
+    "https://raw.githubusercontent.com/jeinlee1991/chinese-llm-benchmark/cd9ce5a66dd37c84beec50ecd0777abc716ed7bc/";
 
 const SOURCE_URLS = {
     modelsDev: "https://models.dev/api.json",
     showdown:
-        "https://raw.githubusercontent.com/verseles/showdown/ca4749c3d11b15757192af7d8b88b5f97650772d/data/showdown.json",
+        "https://raw.githubusercontent.com/verseles/showdown/aba476b837e06609807a8ef0f1125262a360bdc9/data/showdown.json",
     jeinlee: JEINLEE_BASE,
 };
 

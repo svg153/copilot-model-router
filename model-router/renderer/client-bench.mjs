@@ -13,9 +13,15 @@ function renderRecommendations() {
   ROLE_PLAYBOOK.forEach(function (playbook) {
     var ranked = rankFor(playbook);
     var best = ranked[0];
-    var pinned = agents[playbook.type] ? agents[playbook.type].model : null;
+    var entry = agents[playbook.type] || {};
+    var pinned = entry.model || null;
+    var pinnedEffort = entry.effortLevel || "";
     var pinnedModel = pinned ? findModel(pinned) : null;
     var matches = pinned === best.model.id;
+    var bestEfforts = effortOptionsFor(best.model.id);
+    // Effort about to be pinned with the recommended model; starts from what
+    // is already fixed so the card shows the real current state.
+    var chosenEffort = matches ? pinnedEffort : "";
 
     var card = el("div", { className: "card" + (matches ? " mine" : "") }, [
       el("h3", { className: "mono", textContent: playbook.type }),
@@ -50,6 +56,7 @@ function renderRecommendations() {
       el("span", { className: "muted", textContent: "Fijado ahora: " }),
       el("span", { className: "mono", textContent: pinned || "(sin definir)" })
     ]);
+    if (pinnedEffort) pinLine.append(el("span", { className: "mono", textContent: " · " + pinnedEffort }));
     if (pinnedModel && !pinnedModel.external && !best.model.external && typeof pinnedModel.blendedCost === "number" && typeof best.model.blendedCost === "number" && best.model.blendedCost > 0) {
       var factor = pinnedModel.blendedCost / best.model.blendedCost;
       if (factor >= 1.6) {
@@ -59,21 +66,41 @@ function renderRecommendations() {
     }
     card.append(pinLine);
 
-    if (!matches) {
-      card.append(el("button", {
+    // Effort travels with the pin: the recommended model is only half the
+    // decision, and the same levels as the routing tab apply here.
+    var effortRow = el("div", { className: "small", style: { display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" } }, [
+      el("span", { className: "muted", textContent: "Esfuerzo:" })
+    ]);
+    effortRow.append(selectFrom(bestEfforts, chosenEffort, function (value) {
+      chosenEffort = value;
+      paintActions();
+    }));
+    card.append(effortRow);
+
+    var actions = el("div");
+    function paintActions() {
+      actions.replaceChildren();
+      if (matches && chosenEffort === pinnedEffort) {
+        actions.append(el("p", { className: "tiny", style: { margin: "8px 0 0" },
+          textContent: pinnedEffort ? "Ya coincide: modelo y esfuerzo fijados." : "Ya coincide con la recomendación." }));
+        return;
+      }
+      actions.append(el("button", {
         className: "mini primary", style: { marginTop: "8px" },
-        textContent: "Fijar " + best.model.label,
+        textContent: "Fijar " + best.model.label + (chosenEffort ? " · " + chosenEffort : ""),
         onclick: function () {
-          agents[playbook.type] = Object.assign({}, agents[playbook.type] || {}, { model: best.model.id });
+          var next = Object.assign({}, agents[playbook.type] || {}, { model: best.model.id });
+          if (chosenEffort) next.effortLevel = chosenEffort; else delete next.effortLevel;
+          agents[playbook.type] = next;
           state.subagents.agents = agents;
           markDirty();
           renderRecommendations();
           renderSubagents();
         }
       }));
-    } else {
-      card.append(el("p", { className: "tiny", style: { margin: "8px 0 0" }, textContent: "Ya coincide con la recomendación." }));
     }
+    paintActions();
+    card.append(actions);
 
     host.append(card);
   });
@@ -99,7 +126,9 @@ function renderProfile() {
 
   var keys = Object.keys(model.bench || {});
   if (!keys.length) {
-    host.append(el("p", { className: "small muted", textContent: "Este modelo todavía no tiene notas públicas de benchmark." }));
+    host.append(el("p", { className: "small muted", textContent:
+      "Este modelo todavía no tiene notas públicas de benchmark: ninguna fuente de la instantánea lo mide a él ni a ninguna variante de su familia. " +
+      "Las fuentes van por detrás de los lanzamientos; en cuanto midan el modelo o un hermano de la misma familia, aparecerá aquí (los marcados con ~ son estimaciones por familia)." }));
   } else {
     if (model.benchEstimated) {
       host.append(el("p", { className: "small warn-line", style: { marginTop: "0" },
@@ -115,6 +144,10 @@ function renderProfile() {
         el("span", { className: "val", textContent: num(value) })
       ]));
     });
+    if (model.effortOptions && model.effortOptions.length > 1) {
+      host.append(el("p", { className: "tiny muted", style: { marginTop: "6px" },
+        textContent: "Las notas no desglosan por nivel de esfuerzo: cambiar el esfuerzo altera la calidad, latencia y coste reales de cada uso, pero la fuente mide el modelo una sola vez." }));
+    }
   }
 
   var facts = [
