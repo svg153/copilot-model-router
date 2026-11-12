@@ -253,6 +253,31 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
     @keyframes fb-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 }
 
+/* Modal de revisión de cambios (guardar protegido, P1-1) */
+.fb-modal.rev-modal { width: min(640px, 94vw); }
+.rev-warn {
+    margin: 10px 14px 4px; padding: 8px 10px; font-size: 12px; border-radius: 8px;
+    background: color-mix(in srgb, var(--true-color-amber, #9a6700) 10%, transparent);
+    color: var(--text-color-default, #1f2328);
+}
+.rev-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px;
+    align-items: baseline; padding: 5px 14px; font-size: 12px; min-height: 26px;
+}
+.rev-row:nth-child(odd) { background: var(--background-color-muted, #f6f8fa); }
+.rev-label { color: var(--text-color-muted, #59636e); overflow-wrap: anywhere; }
+.rev-values { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; min-width: 0; }
+.rev-before { color: var(--text-color-muted, #59636e); text-decoration: line-through; overflow-wrap: anywhere; }
+.rev-arrow { color: var(--text-color-muted, #59636e); }
+.rev-after { font-weight: 600; color: var(--true-color-green, #1a7f37); overflow-wrap: anywhere; }
+.rev-summary { margin: 10px 14px 0; font-size: 12px; color: var(--text-color-muted, #59636e); }
+.rev-actions {
+    position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px;
+    margin-top: 12px; padding: 10px 14px 4px;
+    background: var(--background-color-raised, #ffffff);
+    border-top: 1px solid var(--border-color-muted, #e7ebf0);
+}
+
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
 .card {
     border: 1px solid var(--border-color-default, #d1d9e0); border-radius: 12px; padding: 14px;

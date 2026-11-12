@@ -13,6 +13,7 @@ function renderRecommendations() {
   ROLE_PLAYBOOK.forEach(function (playbook) {
     var ranked = rankFor(playbook);
     var best = ranked[0];
+    if (!best) return; // empty catalog: nothing to recommend yet
     var entry = agents[playbook.type] || {};
     var pinned = entry.model || null;
     var pinnedEffort = entry.effortLevel || "";

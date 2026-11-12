@@ -1,5 +1,11 @@
 // Client section "core: boot, dom helpers, formatting, filtering, scoring" (split from renderer.mjs, issue #13).
 export const CLIENT_CORE = String.raw`var state = JSON.parse(JSON.stringify(BOOT.routing));
+// Last value known to be on disk, and its content fingerprint. The review
+// modal diffs against savedRouting; saves echo routingRevision so the server
+// can detect that another window wrote first (HTTP 412).
+var savedRouting = JSON.parse(JSON.stringify(state));
+var routingRevision = BOOT.routingRevision || "absent";
+function cloneConfig(value) { return JSON.parse(JSON.stringify(value)); }
 var ROUTER_TOKEN = BOOT.routerToken || "";
 var catalogSnapshot = BOOT.catalog || {};
 var catalogDiagnostics = BOOT.catalogDiagnostics || {};
