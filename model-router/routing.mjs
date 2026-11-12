@@ -3,7 +3,8 @@
 // Everything here is plain data so both the canvas renderer and the workflow
 // body can share one source of truth.
 
-import { copyFile, mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { applyEnrichment } from "./enrichment.mjs";
@@ -653,6 +654,63 @@ export async function resetRouting() {
     await mkdir(dirname(ROUTING_FILE), { recursive: true });
     await writeFile(ROUTING_FILE, json, "utf8");
     return mergeRouting(defaults, null);
+}
+
+/**
+ * The routing document as it would look after /reset, without touching disk.
+ * The canvas uses it to preview a reset as a diff instead of a blind confirm.
+ */
+export async function defaultsRouting() {
+    const catalog = await detectedCatalog();
+    const defaults = normalizeRoutingModels(defaultRoutingFor(catalog), modelsFromCatalog(catalog));
+    return mergeRouting(defaults, null);
+}
+
+/**
+ * Content fingerprint of routing.json as stored on disk (not the healed
+ * in-memory view, so catalog drift between load and save never fakes a
+ * conflict). "absent" identifies the normal first-run state with no file.
+ */
+export async function routingRevision() {
+    try {
+        return createHash("sha256").update(await readFile(ROUTING_FILE, "utf8")).digest("hex").slice(0, 16);
+    } catch {
+        return "absent";
+    }
+}
+
+/**
+ * Single-step undo: restore the previous saved state from routing.json.bak by
+ * swapping it with the current file, so a second undo replays the swap rather
+ * than losing the state you just discarded. The backup is only trusted after
+ * parsing it, and messages are written for people, not for logs.
+ */
+export async function undoRouting() {
+    let prevRaw;
+    try {
+        prevRaw = await readFile(ROUTING_BAK_FILE, "utf8");
+    } catch {
+        throw new Error("No hay una versión anterior que deshacer.");
+    }
+    try {
+        parseRouting(prevRaw);
+    } catch {
+        throw new Error("La copia de seguridad está dañada; no se puede deshacer.");
+    }
+    let curRaw = null;
+    try {
+        curRaw = await readFile(ROUTING_FILE, "utf8");
+    } catch {
+        /* routing.json missing: undo just restores the backup */
+    }
+    if (curRaw === prevRaw) return loadRouting();
+    await mkdir(dirname(ROUTING_FILE), { recursive: true });
+    const tmp = `${ROUTING_FILE}.tmp`;
+    await writeFile(tmp, prevRaw, "utf8");
+    await rename(tmp, ROUTING_FILE);
+    if (curRaw === null) await unlink(ROUTING_BAK_FILE).catch(() => {});
+    else await writeFile(ROUTING_BAK_FILE, curRaw, "utf8");
+    return loadRouting();
 }
 
 /**

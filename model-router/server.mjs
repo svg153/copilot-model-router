@@ -15,9 +15,12 @@ import {
     BUILTIN_SUBAGENT_TYPES,
     MODEL_POLICIES,
     catalogDiagnostics,
+    defaultsRouting,
     loadRouting,
     resetRouting,
+    routingRevision,
     saveRouting,
+    undoRouting,
 } from "./routing.mjs";
 import { renderHtml } from "./renderer/index.mjs";
 
@@ -74,8 +77,8 @@ function readBody(req) {
     });
 }
 
-function broadcastRouting(entry, routing) {
-    const payload = `event: routing\ndata: ${JSON.stringify(routing)}\n\n`;
+function broadcastRouting(entry, routing, revision) {
+    const payload = `event: routing\ndata: ${JSON.stringify({ routing, revision: revision ?? "" })}\n\n`;
     for (const client of entry.clients) client.write(payload);
 }
 
@@ -124,7 +127,12 @@ export async function startServer(deps) {
         }
 
         if (req.method === "GET" && url.pathname === "/routing") {
-            sendJson(res, 200, { routing: await loadRouting() });
+            sendJson(res, 200, { routing: await loadRouting(), revision: await routingRevision() });
+            return;
+        }
+
+        if (req.method === "GET" && url.pathname === "/defaults") {
+            sendJson(res, 200, { routing: await defaultsRouting() });
             return;
         }
 
@@ -147,13 +155,44 @@ export async function startServer(deps) {
             return;
         }
 
-        if (req.method === "POST" && (url.pathname === "/routing" || url.pathname === "/reset")) {
+        if (
+            req.method === "POST" &&
+            (url.pathname === "/routing" || url.pathname === "/reset" || url.pathname === "/undo")
+        ) {
             try {
-                const isReset = url.pathname === "/reset";
-                const routing = isReset ? await resetRouting() : await saveRouting(await readBody(req));
-                broadcastRouting(entry, routing);
-                const applied = await applySubagentSettings(routing);
-                sendJson(res, 200, { routing, applied });
+                const body = url.pathname === "/undo" ? {} : await readBody(req);
+                // Optimistic concurrency: a canvas that knew the file when it
+                // opened sends that fingerprint back. If the disk moved on
+                // (another window saved), refuse instead of overwriting blind.
+                const baseRevision = typeof body?.baseRevision === "string" ? body.baseRevision : "";
+                if (baseRevision) {
+                    const current = await routingRevision();
+                    if (current !== baseRevision) {
+                        sendJson(res, 412, {
+                            error: "Otra ventana guardó cambios antes que tú.",
+                            conflict: true,
+                            routing: await loadRouting(),
+                            revision: current,
+                        });
+                        return;
+                    }
+                }
+                let routing;
+                let applied = false;
+                if (url.pathname === "/undo") {
+                    routing = await undoRouting();
+                    applied = await applySubagentSettings(routing);
+                } else if (url.pathname === "/reset") {
+                    routing = await resetRouting();
+                    applied = await applySubagentSettings(routing);
+                } else {
+                    const { baseRevision: _base, ...patch } = body;
+                    routing = await saveRouting(patch);
+                    applied = await applySubagentSettings(routing);
+                }
+                const revision = await routingRevision();
+                broadcastRouting(entry, routing, revision);
+                sendJson(res, 200, { routing, revision, applied });
             } catch (error) {
                 sendJson(res, 400, { error: String(error?.message ?? error) });
             }
@@ -207,6 +246,7 @@ export async function startServer(deps) {
                     subagentTypes: BUILTIN_SUBAGENT_TYPES,
                     modelPolicies: MODEL_POLICIES,
                     routerToken: token,
+                    routingRevision: await routingRevision(),
                 })
             );
             return;

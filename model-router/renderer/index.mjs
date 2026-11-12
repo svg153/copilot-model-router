@@ -40,7 +40,7 @@ export function escapeJsonForScript(value) {
  * @param {string[]} options.subagentTypes
  * @param {string[]} options.modelPolicies
  */
-export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, effortLevels, subagentTypes, modelPolicies, routerToken }) {
+export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, effortLevels, subagentTypes, modelPolicies, routerToken, routingRevision }) {
     const boot = {
         routing,
         catalog,
@@ -51,6 +51,9 @@ export function renderHtml({ routing, catalog, catalogDiagnostics, benchmarks, e
         modelPolicies,
         // Per-server secret; POSTs must echo it back (see server.mjs guard).
         routerToken: routerToken ?? "",
+        // Content fingerprint of routing.json at page load; echoed on save so
+        // the server can refuse to overwrite a newer file (412 conflict).
+        routingRevision: routingRevision ?? "absent",
     };
 
     return `<!doctype html>
