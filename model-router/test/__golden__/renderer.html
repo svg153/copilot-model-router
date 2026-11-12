@@ -184,7 +184,7 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 
 /* Selector de fallback: botón "+" y modal de catálogo */
 .fb-add {
-    font-size: 12px; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; padding: 4px 12px; border-radius: 6px; cursor: pointer;
     border: 1px dashed var(--border-color-default, #d1d9e0); background: none;
     color: var(--text-color-muted, #59636e);
 }
@@ -200,35 +200,40 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
     box-shadow: 0 12px 40px rgba(0, 0, 0, .25); padding: 0 0 8px;
 }
 .fb-modal-head {
-    position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center;
     padding: 10px 14px; background: var(--background-color-raised, #ffffff);
     border-bottom: 1px solid var(--border-color-muted, #e7ebf0);
 }
 .fb-modal-title { font-size: 13px; }
 .fb-modal-close {
-    border: 0; background: none; font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 6px;
+    border: 0; background: none; font-size: 13px; cursor: pointer;
+    min-width: 26px; min-height: 26px; border-radius: 6px;
     color: var(--text-color-muted, #59636e);
 }
 .fb-modal-close:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
 .fb-group {
-    padding: 10px 14px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
-    color: var(--text-color-muted, #59636e);
+    position: sticky; top: 36px; z-index: 1;
+    padding: 8px 14px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--text-color-muted, #59636e); background: var(--background-color-raised, #ffffff);
 }
 .fb-opt {
     display: grid; grid-template-columns: minmax(0, 1fr) auto 22px; gap: 8px; align-items: center;
     width: 100%; text-align: left; border: 0; background: none; cursor: pointer;
-    padding: 6px 14px; font-size: 12px;
+    padding: 7px 14px; min-height: 34px; font-size: 13px; color: var(--text-color-default, #1f2328);
 }
 .fb-opt:hover { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 10%, transparent); }
+.fb-opt.fb-on { background: color-mix(in srgb, var(--true-color-green, #1a7f37) 9%, transparent); }
+.fb-opt.fb-on:hover { background: color-mix(in srgb, var(--true-color-green, #1a7f37) 16%, transparent); }
 .fb-opt-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-opt-meta { color: var(--text-color-muted, #59636e); font-size: 11px; white-space: nowrap; }
 .fb-mark { color: var(--true-color-green, #1a7f37); font-weight: 700; text-align: center; min-height: 1em; }
+.fb-empty { padding: 16px 14px; font-size: 12px; color: var(--text-color-muted, #59636e); }
 
 /* Cadena de fallback */
 .fb-chain { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .fb-chip {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 1px 6px 1px 4px; border-radius: 999px; font-size: 11px;
+    padding: 2px 6px 2px 4px; border-radius: 999px; font-size: 11px;
     border: 1px solid var(--border-color-default, #d1d9e0);
     background: var(--background-color-muted, #f6f8fa);
 }
@@ -240,10 +245,18 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 .fb-chip .fb-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-btn {
     border: 0; background: none; cursor: pointer; font-size: 11px; line-height: 1;
-    padding: 2px 3px; border-radius: 4px; opacity: .65; color: inherit;
+    min-width: 18px; min-height: 18px; border-radius: 4px; opacity: .75; color: inherit;
 }
 .fb-btn:hover { opacity: 1; background: color-mix(in srgb, var(--color-focus-outline, #0969da) 12%, transparent); }
 .fb-x:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
+
+/* Momento de entrada único: el modal se posa; el fondo solo aparece */
+@media (prefers-reduced-motion: no-preference) {
+    .fb-backdrop { animation: fb-fade 120ms ease-out; }
+    .fb-modal { animation: fb-in 160ms cubic-bezier(.16, 1, .3, 1); }
+    @keyframes fb-fade { from { opacity: 0; } }
+    @keyframes fb-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+}
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
 .card {
@@ -1339,26 +1352,47 @@ function selectFrom(values, current, onChange) {
 
 /**
  * Modal para elegir modelos de fallback: catálogo completo agrupado por
- * proveedor (sin buscador). Un clic añade el modelo al final de la cadena;
- * los ya añadidos se marcan con ✓. Se cierra con ✕, pulsando el fondo o ESC.
+ * proveedor (sin buscador). Un clic añade el modelo; clic en uno ya añadido
+ * lo quita (aria-pressed). Se cierra con ✕, pulsando el fondo o ESC, y
+ * devuelve el foco al disparador. Trampa de foco con Tab.
  */
-function openFallbackPicker(titleText, getList, onPick) {
+function openFallbackPicker(titleText, getList, onAdd, onRemove) {
   var rows = [];
+  var lastFocus = null;
+  try { lastFocus = document.activeElement; } catch (_) {}
   var refresh = function () {
     var cur = getList();
-    rows.forEach(function (r) { r.mark.textContent = cur.includes(r.id) ? "✓" : ""; });
+    rows.forEach(function (r) {
+      var on = cur.includes(r.id);
+      r.mark.textContent = on ? "✓" : "";
+      r.row.className = "fb-opt" + (on ? " fb-on" : "");
+      r.row.setAttribute("aria-pressed", on ? "true" : "false");
+      r.row.title = on ? "Quitar " + r.id + " del fallback" : "Añadir " + r.id + " al fallback";
+    });
   };
   var detach = function () {
     try { document.removeEventListener("keydown", onKey); } catch (_) {}
     try { if (back.parentNode) back.parentNode.removeChild(back); } catch (_) { back.style.display = "none"; }
+    try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (_) {}
   };
-  var onKey = function (event) { if (event.key === "Escape") detach(); };
+  var onKey = function (event) {
+    if (event.key === "Escape") { detach(); return; }
+    if (event.key !== "Tab") return;
+    var f = modal.querySelectorAll("button");
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  };
 
   var back = el("div", { className: "fb-backdrop", onclick: function (event) { if (event.target === back) detach(); } });
-  var modal = el("div", { className: "fb-modal" });
+  var modal = el("div", {
+    className: "fb-modal",
+    attrs: { role: "dialog", "aria-modal": "true", "aria-label": titleText }
+  });
   var head = el("div", { className: "fb-modal-head" }, [
     el("strong", { className: "fb-modal-title", textContent: titleText }),
-    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", onclick: detach })
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar catálogo" }, onclick: detach })
   ]);
   modal.append(head);
   catalog.forEach(function (group) {
@@ -1369,10 +1403,11 @@ function openFallbackPicker(titleText, getList, onPick) {
       var row = el("button", {
         type: "button",
         className: "fb-opt",
+        attrs: { "aria-pressed": "false" },
         onclick: function () {
           var cur = getList();
-          if (cur.includes(model.id)) return;
-          onPick(model.id);
+          if (cur.includes(model.id)) { if (onRemove) onRemove(model.id); }
+          else { onAdd(model.id); }
           refresh();
         }
       }, [
@@ -1380,14 +1415,19 @@ function openFallbackPicker(titleText, getList, onPick) {
         el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
         mark
       ]);
-      rows.push({ id: model.id, mark: mark });
+      rows.push({ id: model.id, mark: mark, row: row });
       modal.append(row);
     });
   });
+  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: "No hay modelos en el catálogo. Recarga con el botón «Refrescar»." }));
   back.append(modal);
   document.body.append(back);
   try { document.addEventListener("keydown", onKey); } catch (_) {}
   refresh();
+  try {
+    var focusTarget = modal.querySelector(".fb-opt") || modal.querySelector(".fb-modal-close");
+    if (focusTarget && focusTarget.focus) focusTarget.focus();
+  } catch (_) {}
   return detach;
 }
 
@@ -1397,12 +1437,13 @@ function openFallbackPicker(titleText, getList, onPick) {
  */
 function fallbackChip(idx, total, id, onMove, onRemove) {
   var model = findModel(id);
+  var name = model ? model.label : id;
   return el("span", { className: "fb-chip", title: id }, [
     el("b", { className: "fb-pos", textContent: String(idx + 1) }),
-    el("span", { className: "fb-name", textContent: (model ? model.label : id) }),
-    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: "Subir en la cadena", onclick: function () { onMove(idx, idx - 1); } }) : null,
-    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: "Bajar en la cadena", onclick: function () { onMove(idx, idx + 1); } }) : null,
-    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: "Quitar", onclick: onRemove })
+    el("span", { className: "fb-name", textContent: name }),
+    idx > 0 ? el("button", { type: "button", className: "fb-btn", textContent: "↑", title: "Subir en la cadena", attrs: { "aria-label": "Subir " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx - 1); } }) : null,
+    idx < total - 1 ? el("button", { type: "button", className: "fb-btn", textContent: "↓", title: "Bajar en la cadena", attrs: { "aria-label": "Bajar " + name + " en la cadena de fallback" }, onclick: function () { onMove(idx, idx + 1); } }) : null,
+    el("button", { type: "button", className: "fb-btn fb-x", textContent: "✕", title: "Quitar", attrs: { "aria-label": "Quitar " + name + " del fallback" }, onclick: onRemove })
   ]);
 }
 
@@ -1431,6 +1472,9 @@ function fallbackRow(labelWidth, host, getList, render, updater) {
     onclick: function () {
       openFallbackPicker("Modelos de fallback", getList, function (id) {
         updater(getList().concat([id]));
+        render();
+      }, function (id) {
+        updater(getList().filter(function (x) { return x !== id; }));
         render();
       });
     }

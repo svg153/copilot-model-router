@@ -179,7 +179,7 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 
 /* Selector de fallback: botón "+" y modal de catálogo */
 .fb-add {
-    font-size: 12px; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; padding: 4px 12px; border-radius: 6px; cursor: pointer;
     border: 1px dashed var(--border-color-default, #d1d9e0); background: none;
     color: var(--text-color-muted, #59636e);
 }
@@ -195,35 +195,40 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
     box-shadow: 0 12px 40px rgba(0, 0, 0, .25); padding: 0 0 8px;
 }
 .fb-modal-head {
-    position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center;
     padding: 10px 14px; background: var(--background-color-raised, #ffffff);
     border-bottom: 1px solid var(--border-color-muted, #e7ebf0);
 }
 .fb-modal-title { font-size: 13px; }
 .fb-modal-close {
-    border: 0; background: none; font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 6px;
+    border: 0; background: none; font-size: 13px; cursor: pointer;
+    min-width: 26px; min-height: 26px; border-radius: 6px;
     color: var(--text-color-muted, #59636e);
 }
 .fb-modal-close:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
 .fb-group {
-    padding: 10px 14px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
-    color: var(--text-color-muted, #59636e);
+    position: sticky; top: 36px; z-index: 1;
+    padding: 8px 14px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--text-color-muted, #59636e); background: var(--background-color-raised, #ffffff);
 }
 .fb-opt {
     display: grid; grid-template-columns: minmax(0, 1fr) auto 22px; gap: 8px; align-items: center;
     width: 100%; text-align: left; border: 0; background: none; cursor: pointer;
-    padding: 6px 14px; font-size: 12px;
+    padding: 7px 14px; min-height: 34px; font-size: 13px; color: var(--text-color-default, #1f2328);
 }
 .fb-opt:hover { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 10%, transparent); }
+.fb-opt.fb-on { background: color-mix(in srgb, var(--true-color-green, #1a7f37) 9%, transparent); }
+.fb-opt.fb-on:hover { background: color-mix(in srgb, var(--true-color-green, #1a7f37) 16%, transparent); }
 .fb-opt-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-opt-meta { color: var(--text-color-muted, #59636e); font-size: 11px; white-space: nowrap; }
 .fb-mark { color: var(--true-color-green, #1a7f37); font-weight: 700; text-align: center; min-height: 1em; }
+.fb-empty { padding: 16px 14px; font-size: 12px; color: var(--text-color-muted, #59636e); }
 
 /* Cadena de fallback */
 .fb-chain { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .fb-chip {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 1px 6px 1px 4px; border-radius: 999px; font-size: 11px;
+    padding: 2px 6px 2px 4px; border-radius: 999px; font-size: 11px;
     border: 1px solid var(--border-color-default, #d1d9e0);
     background: var(--background-color-muted, #f6f8fa);
 }
@@ -235,10 +240,18 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 .fb-chip .fb-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb-btn {
     border: 0; background: none; cursor: pointer; font-size: 11px; line-height: 1;
-    padding: 2px 3px; border-radius: 4px; opacity: .65; color: inherit;
+    min-width: 18px; min-height: 18px; border-radius: 4px; opacity: .75; color: inherit;
 }
 .fb-btn:hover { opacity: 1; background: color-mix(in srgb, var(--color-focus-outline, #0969da) 12%, transparent); }
 .fb-x:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
+
+/* Momento de entrada único: el modal se posa; el fondo solo aparece */
+@media (prefers-reduced-motion: no-preference) {
+    .fb-backdrop { animation: fb-fade 120ms ease-out; }
+    .fb-modal { animation: fb-in 160ms cubic-bezier(.16, 1, .3, 1); }
+    @keyframes fb-fade { from { opacity: 0; } }
+    @keyframes fb-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+}
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
 .card {
