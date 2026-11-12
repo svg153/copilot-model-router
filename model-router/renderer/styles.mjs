@@ -177,6 +177,44 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
 
+/* Buscador de fallback (combobox) */
+.combo { position: relative; display: inline-block; min-width: 210px; }
+.combo-input { width: 100%; font-size: 12px; padding: 3px 8px; }
+.combo-pop {
+    display: none; position: absolute; top: 100%; left: 0; z-index: 8;
+    min-width: 100%; max-height: 260px; overflow-y: auto; margin-top: 2px;
+    border: 1px solid var(--border-color-default, #d1d9e0); border-radius: 6px;
+    background: var(--background-color-raised, #ffffff);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .14);
+}
+.combo-item {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    padding: 5px 10px; font-size: 12px; cursor: pointer;
+}
+.combo-item:hover { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 10%, transparent); }
+.combo-empty { padding: 6px 10px; font-size: 12px; color: var(--text-color-muted, #59636e); }
+
+/* Cadena de fallback */
+.fb-chain { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fb-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 6px 1px 4px; border-radius: 999px; font-size: 11px;
+    border: 1px solid var(--border-color-default, #d1d9e0);
+    background: var(--background-color-muted, #f6f8fa);
+}
+.fb-chip .fb-pos {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; font-size: 10px;
+    background: var(--color-focus-outline, #0969da); color: #fff;
+}
+.fb-chip .fb-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-btn {
+    border: 0; background: none; cursor: pointer; font-size: 11px; line-height: 1;
+    padding: 2px 3px; border-radius: 4px; opacity: .65; color: inherit;
+}
+.fb-btn:hover { opacity: 1; background: color-mix(in srgb, var(--color-focus-outline, #0969da) 12%, transparent); }
+.fb-x:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
+
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
 .card {
     border: 1px solid var(--border-color-default, #d1d9e0); border-radius: 12px; padding: 14px;
