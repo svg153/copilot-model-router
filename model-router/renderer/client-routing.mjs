@@ -39,65 +39,57 @@ function selectFrom(values, current, onChange) {
 // --- fallback picker ---------------------------------------------------------
 
 /**
- * Combobox de búsqueda: un input con suggestions filtradas por nombre,
- * vendor o id, en lugar del antiguo listbox de 15 filas. ENTER añade la
- * primera coincidencia; ESC limpia y cierra.
+ * Modal para elegir modelos de fallback: catálogo completo agrupado por
+ * proveedor (sin buscador). Un clic añade el modelo al final de la cadena;
+ * los ya añadidos se marcan con ✓. Se cierra con ✕, pulsando el fondo o ESC.
  */
-function modelCombobox(onPick) {
-  var wrap = el("div", { className: "combo" });
-  var input = el("input", {
-    type: "text",
-    className: "combo-input",
-    placeholder: "Buscar modelo…",
-    attrs: { autocomplete: "off" }
-  });
-  var pop = el("div", { className: "combo-pop" });
-  var close = function () { pop.style.display = "none"; };
-  var render = function () {
-    pop.textContent = "";
-    var q = normalizeKey(input.value);
-    if (!q) { close(); return; }
-    var matches = [];
-    catalog.forEach(function (group) {
-      group.models.forEach(function (model) {
-        if (matches.length >= 12) return;
-        if (normalizeKey(model.label + " " + vendorOf(model) + " " + model.id).includes(q)) matches.push(model);
-      });
-    });
-    if (!matches.length) {
-      pop.append(el("div", { className: "combo-empty", textContent: "Sin coincidencias" }));
-    }
-    matches.forEach(function (model) {
-      pop.append(el("button", {
+function openFallbackPicker(titleText, getList, onPick) {
+  var rows = [];
+  var refresh = function () {
+    var cur = getList();
+    rows.forEach(function (r) { r.mark.textContent = cur.includes(r.id) ? "✓" : ""; });
+  };
+  var detach = function () {
+    try { document.removeEventListener("keydown", onKey); } catch (_) {}
+    try { if (back.parentNode) back.parentNode.removeChild(back); } catch (_) { back.style.display = "none"; }
+  };
+  var onKey = function (event) { if (event.key === "Escape") detach(); };
+
+  var back = el("div", { className: "fb-backdrop", onclick: function (event) { if (event.target === back) detach(); } });
+  var modal = el("div", { className: "fb-modal" });
+  var head = el("div", { className: "fb-modal-head" }, [
+    el("strong", { className: "fb-modal-title", textContent: titleText }),
+    el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", onclick: detach })
+  ]);
+  modal.append(head);
+  catalog.forEach(function (group) {
+    modal.append(el("div", { className: "fb-group", textContent: group.label + (group.id === "copilot" ? "" : " (clave propia)") }));
+    group.models.forEach(function (model) {
+      var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
+      var mark = el("span", { className: "fb-mark", textContent: "" });
+      var row = el("button", {
         type: "button",
-        className: "combo-item",
-        textContent: model.label + "  ·  " + vendorOf(model) + "  ·  " + model.id,
-        onmousedown: function (event) {
-          event.preventDefault(); // no robar el foco antes del click
+        className: "fb-opt",
+        onclick: function () {
+          var cur = getList();
+          if (cur.includes(model.id)) return;
           onPick(model.id);
-          input.value = "";
-          close();
+          refresh();
         }
-      }));
+      }, [
+        el("span", { className: "fb-opt-name", textContent: model.label }),
+        el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
+        mark
+      ]);
+      rows.push({ id: model.id, mark: mark });
+      modal.append(row);
     });
-    pop.style.display = "block";
-  };
-  input.oninput = render;
-  input.onfocus = render;
-  input.onblur = function () { setTimeout(close, 120); };
-  input.onkeydown = function (event) {
-    if (event.key === "Enter") {
-      var first = pop.querySelector(".combo-item");
-      if (first) { first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); }
-      event.preventDefault();
-    } else if (event.key === "Escape") {
-      input.value = "";
-      close();
-      input.blur();
-    }
-  };
-  wrap.append(input, pop);
-  return wrap;
+  });
+  back.append(modal);
+  document.body.append(back);
+  try { document.addEventListener("keydown", onKey); } catch (_) {}
+  refresh();
+  return detach;
 }
 
 /**
@@ -115,13 +107,10 @@ function fallbackChip(idx, total, id, onMove, onRemove) {
   ]);
 }
 
-function fallbackRow(labelWidth, host, list, render, updater) {
+function fallbackRow(labelWidth, host, getList, render, updater) {
+  var list = getList();
   var row = el("div", { className: "meter", style: { gridTemplateColumns: labelWidth + " minmax(0, 1fr)", marginTop: "2px" } });
   var wrap = el("div", { className: "fb-chain" });
-  wrap.append(modelCombobox(function (value) {
-    if (!list.includes(value)) updater(list.concat([value]));
-    render();
-  }));
   list.forEach(function (fbModel, idx) {
     wrap.append(fallbackChip(idx, list.length, fbModel, function (from, to) {
       var next = list.slice();
@@ -135,6 +124,18 @@ function fallbackRow(labelWidth, host, list, render, updater) {
       render();
     }));
   });
+  wrap.append(el("button", {
+    type: "button",
+    className: "fb-add",
+    textContent: list.length ? "+ añadir" : "+ elegir modelos",
+    title: "Abrir el catálogo para elegir modelos de fallback",
+    onclick: function () {
+      openFallbackPicker("Modelos de fallback", getList, function (id) {
+        updater(getList().concat([id]));
+        render();
+      });
+    }
+  }));
   row.append(el("span", { className: "tiny muted", textContent: "  └─ fallback" }), wrap);
   host.append(row);
 }
@@ -166,9 +167,10 @@ function renderRoles() {
     ]);
     host.append(row);
 
-    // Cadena de fallback: buscador + chips reordenables
-    var fallbackEntry = entry.fallback || [];
-    fallbackRow("100px", host, fallbackEntry, renderRoles, function (next) {
+    // Cadena de fallback: botón "+" con modal de catálogo + chips reordenables
+    fallbackRow("100px", host, function () {
+      return (state.roles[role] && state.roles[role].fallback) || [];
+    }, renderRoles, function (next) {
       var updated = Object.assign({}, state.roles[role]);
       if (next.length) updated.fallback = next; else delete updated.fallback;
       state.roles[role] = updated;
@@ -224,9 +226,10 @@ function renderSubagents() {
     ]);
     host.append(row);
 
-      // Cadena de fallback: buscador + chips reordenables
-      var fallbackEntry = entry.fallback || [];
-      fallbackRow("150px", host, fallbackEntry, renderSubagents, function (next) {
+      // Cadena de fallback: botón "+" con modal de catálogo + chips reordenables
+      fallbackRow("150px", host, function () {
+        return (agents[type] && agents[type].fallback) || [];
+      }, renderSubagents, function (next) {
         var updated = Object.assign({}, agents[type] || {});
         if (next.length) updated.fallback = next; else delete updated.fallback;
         agents[type] = updated;
@@ -267,7 +270,7 @@ function renderRoutingDefs() {
     ["Modelo", "Qué modelo atiende ese papel. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
     ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: " +
       effortLevels.join(" · ") + "."],
-    ["Fallback", "Lista de modelos secundarios, en orden de intento. Escribe en el buscador para añadir uno (ENTER sobre la primera coincidencia); las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden."],
+    ["Fallback", "Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo (agrupado por proveedor): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden."],
     ["Exigencia (modelPolicy) — required", "El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium."],
     ["Exigencia (modelPolicy) — preferred", "El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla."],
     ["Exigencia (modelPolicy) — inherit", "Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción."],
