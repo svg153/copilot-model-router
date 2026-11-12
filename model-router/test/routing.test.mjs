@@ -146,10 +146,10 @@ test("policy and canvas surface all four workflow stages", async () => {
     });
     assert.match(html, /orchestrate → plan → execute → verify/);
     assert.match(html, /\["orchestrate", "plan", "execute", "verify"\]/);
-    assert.match(html, /Live session catalog and route diagnostics/);
-    assert.match(html, /Refresh live model list/);
-    assert.match(html, /Add or verify a model provider/);
-    assert.match(html, /does not verify provider credentials or a successful inference request/);
+    assert.match(html, /Catálogo en vivo y diagnósticos de enrutado/);
+    assert.match(html, /Actualizar modelos de la sesión/);
+    assert.match(html, /Añadir o verificar un proveedor de modelos/);
+    assert.match(html, /no verifica credenciales del proveedor ni una petición de inferencia con éxito/);
     assert.match(html, /custom-provider\/model-exact/);
     assert.match(html, /Custom provider/);
     const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];

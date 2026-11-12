@@ -207,7 +207,7 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 }
 .fb-modal-close:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
 .fb-group {
-    position: sticky; top: 36px; z-index: 1;
+    position: sticky; top: 81px; z-index: 1;
     padding: 8px 14px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
     color: var(--text-color-muted, #59636e); background: var(--background-color-raised, #ffffff);
 }
@@ -223,6 +223,44 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 .fb-opt-meta { color: var(--text-color-muted, #59636e); font-size: 11px; white-space: nowrap; }
 .fb-mark { color: var(--true-color-green, #1a7f37); font-weight: 700; text-align: center; min-height: 1em; }
 .fb-empty { padding: 16px 14px; font-size: 12px; color: var(--text-color-muted, #59636e); }
+
+/* Buscador del selector de modelos: barra fija bajo la cabecera del modal */
+.fb-search {
+    position: sticky; top: 37px; z-index: 2; display: flex; gap: 8px; align-items: center;
+    padding: 8px 14px; background: var(--background-color-raised, #ffffff);
+    border-bottom: 1px solid var(--border-color-muted, #e7ebf0);
+}
+.fb-search input {
+    flex: 1; min-width: 0; font-size: 13px; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--border-color-default, #d1d9e0);
+    background: var(--background-color-default, #ffffff); color: var(--text-color-default, #1f2328);
+}
+.fb-count { font-size: 11px; color: var(--text-color-muted, #59636e); white-space: nowrap; }
+.fb-hide { display: none; }
+.fb-opt-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fb-opt-id {
+    font-size: 10px; color: var(--text-color-muted, #59636e);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Pie del modal en modo único: acción discretas (quitar fijado) */
+.fb-foot {
+    position: sticky; bottom: 0; display: flex; justify-content: flex-start; gap: 8px;
+    padding: 10px 14px; background: var(--background-color-raised, #ffffff);
+    border-top: 1px solid var(--border-color-muted, #e7ebf0);
+}
+
+/* Disparador compacto del selector de modelo (sustituye al <select> gigante) */
+.mpk {
+    display: flex; align-items: center; gap: 6px; max-width: 320px; min-width: 0;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    border: 1px solid var(--border-color-default, #d1d9e0);
+    background: var(--background-color-default, #ffffff); color: var(--text-color-default, #1f2328);
+}
+.mpk:hover { border-color: var(--color-focus-outline, #0969da); }
+.mpk-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpk-caret { font-size: 10px; color: var(--text-color-muted, #59636e); flex: none; }
+.mpk-empty .mpk-label { font-style: italic; color: var(--text-color-muted, #59636e); }
+.mf-more { font-style: italic; }
 
 /* Cadena de fallback */
 .fb-chain { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }

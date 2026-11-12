@@ -24,6 +24,9 @@ var benchSort = { key: "total", dir: -1 };
 // Which models the recommendations, the chart and the 3D view are allowed to
 // use. "picked" is keyed by the snapshot's normalised id and null means "all".
 var filters = { provider: "all", picked: null };
+// Colapso de la barra de modelos: con catálogos grandes empieza cerrada y el
+// botón «Mostrar los N modelos» la abre. Se vuelve a cerrar al cambiar de proveedor.
+var modelFilterExpanded = false;
 // The leaderboard carries every model the public benchmark scored, most of
 // which you cannot pick. The table and the 3D map open on your own models; the
 // toggle widens both to the full field for context.
@@ -335,6 +338,7 @@ function togglePick(key) {
 
 function clearFilters() {
   filters = { provider: "all", picked: null };
+  modelFilterExpanded = false;
   onlyMine = true;
   sceneVendors = null;
   sceneShowUnpriced = true;
@@ -377,12 +381,13 @@ function renderFilterBar() {
 
   var providers = clear("providerFilter");
   providers.append(toggleButton("Todos (" + allModels().length + ")", filters.provider === "all",
-    function () { filters.provider = "all"; filters.picked = null; renderFiltered(); }));
+    function () { filters.provider = "all"; filters.picked = null; modelFilterExpanded = false; renderFiltered(); }));
   ids.forEach(function (id) {
     providers.append(toggleButton(providerLabel(id) + " (" + counts[id] + ")", filters.provider === id, function () {
       filters.provider = id;
       // A selection made under another provider would leave an empty list.
       filters.picked = null;
+      modelFilterExpanded = false;
       renderFiltered();
     }));
   });
@@ -392,11 +397,23 @@ function renderFilterBar() {
   if (!visible.length) {
     host.append(el("span", { className: "small muted", textContent: "Ningún modelo seleccionado." }));
   } else {
-    visible.forEach(function (model) {
+    // Con el catálogo completo son cientos de chips: se muestra un trozo y el
+    // resto tras «Mostrar todos», para que la barra no ocupe media pantalla.
+    var LIMIT = 12;
+    var list = (modelFilterExpanded || visible.length <= LIMIT) ? visible : visible.slice(0, LIMIT);
+    list.forEach(function (model) {
       var key = modelKey(model);
       var swatch = el("span", { className: "swatch", style: { background: vendorColor(vendorOf(model)) } });
       host.append(toggleButton(model.label, isPicked(key), function () { togglePick(key); }, swatch));
     });
+    if (visible.length > LIMIT) {
+      var more = el("button", {
+        className: "toggle mf-more", type: "button",
+        textContent: modelFilterExpanded ? "Ver menos" : "Mostrar los " + visible.length + " modelos ▾",
+        onclick: function () { modelFilterExpanded = !modelFilterExpanded; renderFilterBar(); }
+      });
+      host.append(more);
+    }
   }
 
   var actions = clear("filterActions");

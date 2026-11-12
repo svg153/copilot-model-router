@@ -6,11 +6,11 @@ function renderCatalog() {
   var table = clear("catalogTable");
   var head = el("thead");
   head.append(el("tr", null, [
-    el("th", { textContent: "Model" }),
-    el("th", { textContent: "Exact runtime ID" }),
-    el("th", { textContent: "Provider label / runtime ID" }),
+    el("th", { textContent: "Modelo" }),
+    el("th", { textContent: "ID exacto de runtime" }),
+    el("th", { textContent: "Proveedor / ID runtime" }),
     el("th", { textContent: "Fabricante" }),
-    el("th", { textContent: "Vendor metadata source", className: "tiny" }),
+    el("th", { textContent: "Origen del dato", className: "tiny" }),
     el("th", { textContent: "Precio" }),
     el("th", { textContent: "Contexto" }),
     el("th", { textContent: "Global", className: "num" })
@@ -20,7 +20,7 @@ function renderCatalog() {
   var body = el("tbody");
   catalog.forEach(function (group) {
     body.append(el("tr", null, [
-      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + " models" })
+      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + " modelos" })
     ]));
     group.models.forEach(function (model) {
       var origin = model.vendorSource === "runtime" ? "runtime"
@@ -48,29 +48,29 @@ function renderCatalog() {
   var external = allModels().filter(function (model) { return model.external; }).length;
   var sourceIsLive = catalogSnapshot.source === "live";
   document.getElementById("catalogSub").textContent = sourceIsLive
-    ? allModels().length + " models across " + catalog.length + " providers (" + external +
-      " provider-qualified IDs) reported by this session runtime. Listing is not a credential or inference test."
-    : "The live session model list is unavailable; the fallback catalog is shown and cannot confirm model availability.";
+    ? allModels().length + " modelos en " + catalog.length + " proveedores (" + external +
+      " IDs cualificados por proveedor) reportados por el runtime de esta sesión. Que aparezcan aquí no verifica credenciales ni inferencia."
+    : "No hay lista de modelos en vivo; se muestra el catálogo de respaldo, que no puede confirmar disponibilidad.";
 
   var withVendor = allModels().filter(function (model) { return model.vendor; }).length;
   document.getElementById("catalogMeta").textContent =
-    "Vendor metadata identified for " + withVendor + " of " + allModels().length + " models. " +
-    "This metadata comes from the runtime or public snapshot and does not indicate provider registration or callability.";
+    "Dato de fabricante identificado para " + withVendor + " de " + allModels().length + " modelos. " +
+    "Proviene del runtime o de la instantánea pública; no implica registro en proveedor ni que la llamada vaya a funcionar.";
 }
 
 function renderCatalogDiagnostics() {
   var host = clear("catalogDiagnostics");
   var live = catalogSnapshot.source === "live";
   var knownIds = new Set(allModels().map(function (model) { return model.id; }));
-  var rows = [["Stage / subagent", "Configured model ID", "Model policy", "Session runtime status"]];
+  var rows = [["Etapa / subagente", "ID de modelo configurado", "Exigencia", "Estado en el runtime"]];
   var statusFor = function (model) {
-    return !live ? "Unknown — fallback catalog"
-      : knownIds.has(model) ? "Listed by live runtime"
-      : "Not exposed by this session";
+    return !live ? "Desconocido — catálogo de respaldo"
+      : knownIds.has(model) ? "Listado por el runtime en vivo"
+      : "No lo expone esta sesión";
   };
   ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
     var model = state.roles && state.roles[role] && state.roles[role].model || "";
-    rows.push([role, model || "(not configured)", "—", statusFor(model)]);
+    rows.push([role, model || "(sin configurar)", "—", statusFor(model)]);
   });
   // A subagent pin is the one enforced with modelPolicy=required, so an id the
   // runtime cannot resolve silently routes elsewhere; the rows make that visible.
@@ -78,23 +78,23 @@ function renderCatalogDiagnostics() {
   Object.keys(pinnedAgents).forEach(function (type) {
     var entry = pinnedAgents[type] || {};
     if (!entry.model) return;
-    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || "(default)", statusFor(entry.model)]);
+    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || "(predeterminada)", statusFor(entry.model)]);
   });
   var sourceText = live
-    ? "Source: session.rpc.model.list() — live session runtime"
-    : "Source: fallback catalog — live availability could not be confirmed";
+    ? "Fuente: session.rpc.model.list() — runtime de la sesión en vivo"
+    : "Fuente: catálogo de respaldo — no se pudo confirmar disponibilidad en vivo";
   var checkedText = catalogDiagnostics.fetchedAt
-    ? "Last checked: " + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
-    : "Last checked: unknown";
+    ? "Última comprobación: " + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
+    : "Última comprobación: desconocida";
   host.append(el("p", { className: "note", textContent: sourceText + ". " + checkedText +
-    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + " model(s) across " +
-    (catalogDiagnostics.providers || []).length + " provider(s)." }));
+    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + " modelos en " +
+    (catalogDiagnostics.providers || []).length + " proveedores." }));
   if (!live) {
     host.append(el("p", { className: "note", textContent:
-      catalogSnapshot.diagnostic || "The live model-list request failed or returned no models; see the extension log for details. The fallback catalog is display-only and cannot confirm availability." }));
+      catalogSnapshot.diagnostic || "La petición de modelos en vivo falló o no devolvió modelos; consulta el registro de la extensión para más detalle. El catálogo de respaldo es solo informativo y no puede confirmar disponibilidad." }));
   }
   host.append(el("p", { className: "note", textContent:
-    "“Listed by live runtime” means the current session reports the exact ID; it does not verify provider credentials or a successful inference request. “Not exposed” does not mean the model is absent from app settings or a provider registry." }));
+    "«Listado por el runtime en vivo» significa que la sesión actual reporta ese ID exacto; no verifica credenciales del proveedor ni una petición de inferencia con éxito. «No lo expone esta sesión» no significa que el modelo falte en los ajustes de la app ni en el registro de un proveedor." }));
   var table = el("table");
   var head = el("thead");
   head.append(el("tr", null, rows[0].map(function (text) { return el("th", { textContent: text }); })));
@@ -204,8 +204,8 @@ function renderCatalogDiagnostics() {
 
   function renderCatalogDefs() {
   defs("catalogDefs", [
-    ["Session runtime status", "Only an exact model ID present in a successful live session model list is marked as listed. This is not a credential, endpoint, or inference test."],
-    ["Fallback catalog", "A display-only list used when the session model list is unavailable. It never confirms a configured workflow model is available."],
+    ["Estado en el runtime", "Solo se marca como listado un ID de modelo exacto presente en una lista de modelos en vivo de la sesión con éxito. No es una prueba de credenciales, endpoint ni inferencia."],
+    ["Catálogo de respaldo", "Lista solo informativa que se usa cuando la lista de modelos de la sesión no está disponible. Nunca confirma que un modelo del flujo de trabajo esté disponible."],
     ["Proveedor", "Quién sirve el modelo. GitHub Copilot, o el proveedor externo cuya clave tengas configurada."],
     ["Fabricante", "Quién lo construyó. Se muestra aparte del proveedor porque un mismo fabricante puede llegar por varias vías."],
     ["Origen del dato", "De dónde ha salido el fabricante: del runtime, de la instantánea pública, de la familia del modelo o de una heurística sobre el identificador."],

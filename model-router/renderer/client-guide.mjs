@@ -3,10 +3,10 @@ export const CLIENT_GUIDE = String.raw`// --- guide tab ------------------------
 
 function renderGuide() {
   defs("guideDefs", [
-    ["Routing", "Choose models for the four workflow stages (orchestrate, plan, execute, verify) and for the subagents launched by the main agent. Orchestrate prepares decomposition and targets; Plan details implementation; only Execute implements changes."],
+    ["Enrutado (Routing)", "Elige modelos para las cuatro etapas del flujo de trabajo (orchestrate, plan, execute, verify) y para los subagentes que lanza el agente principal. Orchestrate prepara la descomposición y los objetivos; Plan detalla la implementación; solo Execute implementa cambios."],
     ["Exigencia (modelPolicy)", "Decide si el modelo fijado es obligatorio (required), una simple sugerencia (preferred) o si no opinas (inherit). Es lo que evita que una llamada suelta se vaya a un modelo caro sin que te enteres."],
     ["Esfuerzo (effort)", "Cuánto piensa el modelo antes de contestar. Más esfuerzo resuelve mejor lo difícil y cuesta más por llamada; menos esfuerzo responde antes y gasta menos."],
-    ["Catalog", "The model IDs reported by this session's model-list RPC. This list does not inspect provider settings or credentials and does not guarantee inference will succeed. It includes vendor, price category, context, and public benchmark score when available."],
+    ["Catálogo", "Los IDs de modelo que reporta el RPC de lista de modelos de esta sesión. Esta lista no inspecciona ajustes ni credenciales del proveedor y no garantiza que la inferencia vaya a funcionar. Incluye fabricante, categoría de precio, contexto y nota de benchmarks públicos cuando están disponibles."],
     ["Comparativa", "La parte educativa: para cada tipo de tarea te dice qué modelo sale mejor y por qué, con las notas públicas de benchmarks y el precio al lado."],
     ["Benchmark", "Una prueba estandarizada con la que se mide a los modelos. Ninguno gana en todo: hay quien escribe mejor código y quien razona mejor. Por eso la recomendación cambia según la tarea."],
     ["Fabricante frente a proveedor", "El proveedor es quien te sirve el modelo (GitHub Copilot o tu proveedor externo). El fabricante es quien lo construyó (Anthropic, OpenAI, Alibaba…). Un mismo fabricante puede llegarte por las dos vías."],

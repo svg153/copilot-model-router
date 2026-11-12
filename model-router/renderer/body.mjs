@@ -33,11 +33,11 @@ export const BODY = `
 <section class="panel" data-panel="routing" data-active="true">
   <div class="banner" id="filterBanner" style="display:none"></div>
   <div class="section">
-    <h2>Workflow roles</h2>
+    <h2>Roles del flujo de trabajo</h2>
     <p class="sub">
-      The workflow <span class="mono">orchestrate → plan → execute → verify</span> has four stages.
-      Orchestrate decomposes the task and supplies targets to Plan; it does not implement changes.
-      Choose the model and reasoning effort for each stage here.
+      El flujo de trabajo <span class="mono">orchestrate → plan → execute → verify</span> tiene cuatro etapas.
+      Orchestrate descompone la tarea y entrega los objetivos a Plan; no implementa cambios.
+      Elige aquí el modelo y el esfuerzo de razonamiento de cada etapa.
     </p>
     <div id="roles"></div>
   </div>
@@ -59,10 +59,10 @@ export const BODY = `
 
 <section class="panel" data-panel="catalog">
   <div class="section">
-    <h2>Live session catalog and route diagnostics</h2>
-    <p class="sub" id="catalogSub">Models reported by the current session runtime. This is not a provider registry or credential test.</p>
+    <h2>Catálogo en vivo y diagnósticos de enrutado</h2>
+    <p class="sub" id="catalogSub">Modelos reportados por el runtime de la sesión actual. Esto no es un registro de proveedores ni una prueba de credenciales.</p>
     <div class="bar-top" style="margin-bottom:10px">
-      <button id="refreshCatalog">Refresh live model list</button>
+      <button id="refreshCatalog">Actualizar modelos de la sesión</button>
       <span id="catalogRefreshStatus" class="status"></span>
     </div>
     <div id="catalogDiagnostics"></div>
@@ -70,24 +70,26 @@ export const BODY = `
     <div class="tablewrap"><table id="catalogTable"></table></div>
   </div>
   <div class="section">
-    <h2>Add or verify a model provider</h2>
+    <h2>Añadir o verificar un proveedor de modelos</h2>
     <p class="sub">
-      In the GitHub Copilot desktop app, open <strong>Settings → Model providers → Add provider</strong>,
-      save the provider, then select one of its models in the app's model picker. Provider credentials
-      are managed by the app. Refresh this catalog from the current session; a provider shown in app
-      settings but missing here is not exposed by this session's model-list RPC.
+      En la app de escritorio GitHub Copilot, abre <strong>Settings → Model providers → Add provider</strong>,
+      guarda el proveedor y después selecciona uno de sus modelos en el selector de modelos de la app. Las
+      credenciales del proveedor las gestiona la app. Actualiza este catálogo desde la sesión actual: un
+      proveedor que aparezca en los ajustes de la app pero no aquí no lo expone el RPC de lista de modelos
+      de esta sesión.
     </p>
     <p class="sub">
-      For the standalone Copilot CLI, configure <code>~/.copilot/providers.json</code> (or the path
-      in <code>COPILOT_PROVIDERS_CONFIG</code>) and restart the CLI. The CLI's provider file stores
-      credentials as plain text; keep it private and never commit it. Provider registration and a
-      model ID in this router do not prove that the current session can invoke that model.
+      Para la Copilot CLI independiente, configura <code>~/.copilot/providers.json</code> (o la ruta en
+      <code>COPILOT_PROVIDERS_CONFIG</code>) y reinicia la CLI. El archivo de proveedores de la CLI guarda
+      las credenciales en texto plano; mantenlo privado y nunca lo confirmes. Que un proveedor esté
+      registrado y un ID de modelo aparezca en este router no prueba que la sesión actual pueda invocar
+      ese modelo.
     </p>
     <p class="sub">
-      See GitHub's official guides:
-      <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">Copilot app providers</a>
-      and
-      <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">Copilot CLI providers</a>.
+      Consulta las guías oficiales de GitHub:
+      <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en la app de Copilot</a>
+      y
+      <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en Copilot CLI</a>.
     </p>
   </div>
   <div class="section">
@@ -206,7 +208,7 @@ export const BODY = `
       <dt>Tamaño de la esfera</dt>
       <dd>Nota global: cuanto más grande, mejor.</dd>
       <dt>Color</dt>
-      <dd>Vendor. A halo marks models listed by this session's live model RPC; it does not confirm credentials or successful inference.</dd>
+      <dd>Fabricante. Un halo marca los modelos que lista el RPC en vivo de esta sesión; no confirma credenciales ni una inferencia con éxito.</dd>
       <dt>Filtros del mapa</dt>
       <dd>
         <b>Solo mis modelos</b> arranca activado y deja en pantalla únicamente los modelos que puedes elegir, igual que

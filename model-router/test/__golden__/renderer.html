@@ -212,7 +212,7 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 }
 .fb-modal-close:hover { background: color-mix(in srgb, var(--true-color-red, #cf222e) 12%, transparent); color: var(--true-color-red, #cf222e); }
 .fb-group {
-    position: sticky; top: 36px; z-index: 1;
+    position: sticky; top: 81px; z-index: 1;
     padding: 8px 14px 5px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
     color: var(--text-color-muted, #59636e); background: var(--background-color-raised, #ffffff);
 }
@@ -228,6 +228,44 @@ tr.mine td { background: color-mix(in srgb, var(--color-focus-outline, #0969da) 
 .fb-opt-meta { color: var(--text-color-muted, #59636e); font-size: 11px; white-space: nowrap; }
 .fb-mark { color: var(--true-color-green, #1a7f37); font-weight: 700; text-align: center; min-height: 1em; }
 .fb-empty { padding: 16px 14px; font-size: 12px; color: var(--text-color-muted, #59636e); }
+
+/* Buscador del selector de modelos: barra fija bajo la cabecera del modal */
+.fb-search {
+    position: sticky; top: 37px; z-index: 2; display: flex; gap: 8px; align-items: center;
+    padding: 8px 14px; background: var(--background-color-raised, #ffffff);
+    border-bottom: 1px solid var(--border-color-muted, #e7ebf0);
+}
+.fb-search input {
+    flex: 1; min-width: 0; font-size: 13px; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--border-color-default, #d1d9e0);
+    background: var(--background-color-default, #ffffff); color: var(--text-color-default, #1f2328);
+}
+.fb-count { font-size: 11px; color: var(--text-color-muted, #59636e); white-space: nowrap; }
+.fb-hide { display: none; }
+.fb-opt-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fb-opt-id {
+    font-size: 10px; color: var(--text-color-muted, #59636e);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Pie del modal en modo único: acción discretas (quitar fijado) */
+.fb-foot {
+    position: sticky; bottom: 0; display: flex; justify-content: flex-start; gap: 8px;
+    padding: 10px 14px; background: var(--background-color-raised, #ffffff);
+    border-top: 1px solid var(--border-color-muted, #e7ebf0);
+}
+
+/* Disparador compacto del selector de modelo (sustituye al <select> gigante) */
+.mpk {
+    display: flex; align-items: center; gap: 6px; max-width: 320px; min-width: 0;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    border: 1px solid var(--border-color-default, #d1d9e0);
+    background: var(--background-color-default, #ffffff); color: var(--text-color-default, #1f2328);
+}
+.mpk:hover { border-color: var(--color-focus-outline, #0969da); }
+.mpk-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpk-caret { font-size: 10px; color: var(--text-color-muted, #59636e); flex: none; }
+.mpk-empty .mpk-label { font-style: italic; color: var(--text-color-muted, #59636e); }
+.mf-more { font-style: italic; }
 
 /* Cadena de fallback */
 .fb-chain { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -474,11 +512,11 @@ h2::before {
 <section class="panel" data-panel="routing" data-active="true">
   <div class="banner" id="filterBanner" style="display:none"></div>
   <div class="section">
-    <h2>Workflow roles</h2>
+    <h2>Roles del flujo de trabajo</h2>
     <p class="sub">
-      The workflow <span class="mono">orchestrate → plan → execute → verify</span> has four stages.
-      Orchestrate decomposes the task and supplies targets to Plan; it does not implement changes.
-      Choose the model and reasoning effort for each stage here.
+      El flujo de trabajo <span class="mono">orchestrate → plan → execute → verify</span> tiene cuatro etapas.
+      Orchestrate descompone la tarea y entrega los objetivos a Plan; no implementa cambios.
+      Elige aquí el modelo y el esfuerzo de razonamiento de cada etapa.
     </p>
     <div id="roles"></div>
   </div>
@@ -500,10 +538,10 @@ h2::before {
 
 <section class="panel" data-panel="catalog">
   <div class="section">
-    <h2>Live session catalog and route diagnostics</h2>
-    <p class="sub" id="catalogSub">Models reported by the current session runtime. This is not a provider registry or credential test.</p>
+    <h2>Catálogo en vivo y diagnósticos de enrutado</h2>
+    <p class="sub" id="catalogSub">Modelos reportados por el runtime de la sesión actual. Esto no es un registro de proveedores ni una prueba de credenciales.</p>
     <div class="bar-top" style="margin-bottom:10px">
-      <button id="refreshCatalog">Refresh live model list</button>
+      <button id="refreshCatalog">Actualizar modelos de la sesión</button>
       <span id="catalogRefreshStatus" class="status"></span>
     </div>
     <div id="catalogDiagnostics"></div>
@@ -511,24 +549,26 @@ h2::before {
     <div class="tablewrap"><table id="catalogTable"></table></div>
   </div>
   <div class="section">
-    <h2>Add or verify a model provider</h2>
+    <h2>Añadir o verificar un proveedor de modelos</h2>
     <p class="sub">
-      In the GitHub Copilot desktop app, open <strong>Settings → Model providers → Add provider</strong>,
-      save the provider, then select one of its models in the app's model picker. Provider credentials
-      are managed by the app. Refresh this catalog from the current session; a provider shown in app
-      settings but missing here is not exposed by this session's model-list RPC.
+      En la app de escritorio GitHub Copilot, abre <strong>Settings → Model providers → Add provider</strong>,
+      guarda el proveedor y después selecciona uno de sus modelos en el selector de modelos de la app. Las
+      credenciales del proveedor las gestiona la app. Actualiza este catálogo desde la sesión actual: un
+      proveedor que aparezca en los ajustes de la app pero no aquí no lo expone el RPC de lista de modelos
+      de esta sesión.
     </p>
     <p class="sub">
-      For the standalone Copilot CLI, configure <code>~/.copilot/providers.json</code> (or the path
-      in <code>COPILOT_PROVIDERS_CONFIG</code>) and restart the CLI. The CLI's provider file stores
-      credentials as plain text; keep it private and never commit it. Provider registration and a
-      model ID in this router do not prove that the current session can invoke that model.
+      Para la Copilot CLI independiente, configura <code>~/.copilot/providers.json</code> (o la ruta en
+      <code>COPILOT_PROVIDERS_CONFIG</code>) y reinicia la CLI. El archivo de proveedores de la CLI guarda
+      las credenciales en texto plano; mantenlo privado y nunca lo confirmes. Que un proveedor esté
+      registrado y un ID de modelo aparezca en este router no prueba que la sesión actual pueda invocar
+      ese modelo.
     </p>
     <p class="sub">
-      See GitHub's official guides:
-      <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">Copilot app providers</a>
-      and
-      <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">Copilot CLI providers</a>.
+      Consulta las guías oficiales de GitHub:
+      <a href="https://docs.github.com/en/copilot/how-tos/github-copilot-app/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en la app de Copilot</a>
+      y
+      <a href="https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-llm-models" target="_blank" rel="noreferrer noopener">proveedores en Copilot CLI</a>.
     </p>
   </div>
   <div class="section">
@@ -647,7 +687,7 @@ h2::before {
       <dt>Tamaño de la esfera</dt>
       <dd>Nota global: cuanto más grande, mejor.</dd>
       <dt>Color</dt>
-      <dd>Vendor. A halo marks models listed by this session's live model RPC; it does not confirm credentials or successful inference.</dd>
+      <dd>Fabricante. Un halo marca los modelos que lista el RPC en vivo de esta sesión; no confirma credenciales ni una inferencia con éxito.</dd>
       <dt>Filtros del mapa</dt>
       <dd>
         <b>Solo mis modelos</b> arranca activado y deja en pantalla únicamente los modelos que puedes elegir, igual que
@@ -719,6 +759,9 @@ var benchSort = { key: "total", dir: -1 };
 // Which models the recommendations, the chart and the 3D view are allowed to
 // use. "picked" is keyed by the snapshot's normalised id and null means "all".
 var filters = { provider: "all", picked: null };
+// Colapso de la barra de modelos: con catálogos grandes empieza cerrada y el
+// botón «Mostrar los N modelos» la abre. Se vuelve a cerrar al cambiar de proveedor.
+var modelFilterExpanded = false;
 // The leaderboard carries every model the public benchmark scored, most of
 // which you cannot pick. The table and the 3D map open on your own models; the
 // toggle widens both to the full field for context.
@@ -1030,6 +1073,7 @@ function togglePick(key) {
 
 function clearFilters() {
   filters = { provider: "all", picked: null };
+  modelFilterExpanded = false;
   onlyMine = true;
   sceneVendors = null;
   sceneShowUnpriced = true;
@@ -1072,12 +1116,13 @@ function renderFilterBar() {
 
   var providers = clear("providerFilter");
   providers.append(toggleButton("Todos (" + allModels().length + ")", filters.provider === "all",
-    function () { filters.provider = "all"; filters.picked = null; renderFiltered(); }));
+    function () { filters.provider = "all"; filters.picked = null; modelFilterExpanded = false; renderFiltered(); }));
   ids.forEach(function (id) {
     providers.append(toggleButton(providerLabel(id) + " (" + counts[id] + ")", filters.provider === id, function () {
       filters.provider = id;
       // A selection made under another provider would leave an empty list.
       filters.picked = null;
+      modelFilterExpanded = false;
       renderFiltered();
     }));
   });
@@ -1087,11 +1132,23 @@ function renderFilterBar() {
   if (!visible.length) {
     host.append(el("span", { className: "small muted", textContent: "Ningún modelo seleccionado." }));
   } else {
-    visible.forEach(function (model) {
+    // Con el catálogo completo son cientos de chips: se muestra un trozo y el
+    // resto tras «Mostrar todos», para que la barra no ocupe media pantalla.
+    var LIMIT = 12;
+    var list = (modelFilterExpanded || visible.length <= LIMIT) ? visible : visible.slice(0, LIMIT);
+    list.forEach(function (model) {
       var key = modelKey(model);
       var swatch = el("span", { className: "swatch", style: { background: vendorColor(vendorOf(model)) } });
       host.append(toggleButton(model.label, isPicked(key), function () { togglePick(key); }, swatch));
     });
+    if (visible.length > LIMIT) {
+      var more = el("button", {
+        className: "toggle mf-more", type: "button",
+        textContent: modelFilterExpanded ? "Ver menos" : "Mostrar los " + visible.length + " modelos ▾",
+        onclick: function () { modelFilterExpanded = !modelFilterExpanded; renderFilterBar(); }
+      });
+      host.append(more);
+    }
   }
 
   var actions = clear("filterActions");
@@ -1344,27 +1401,50 @@ function mean(values, fallback) {
 
 // --- routing tab ------------------------------------------------------------
 
-function modelSelect(current, onChange) {
-  var select = el("select", { onchange: function (event) { onChange(event.target.value); } });
-  catalog.forEach(function (group) {
-    var optgroup = el("optgroup", { label: group.label + (group.id === "copilot" ? "" : " (clave propia)") });
-    group.models.forEach(function (model) {
-      // El tercer campo es el TIER de coste, no el esfuerzo: se etiqueta como
-      // "coste:" para que no se confunda con los niveles del desplegable contiguo.
-      var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
-      var option = el("option", {
-        value: model.id,
-        textContent: model.label + "  ·  " + vendorOf(model) + "  ·  " + cost
-      });
-      if (model.id === current) option.selected = true;
-      optgroup.append(option);
-    });
-    select.append(optgroup);
+/** Model IDs currently pinned to a role or subagent; they head the picker. */
+function modelPickedIds() {
+  var ids = [];
+  var roles = state.roles || {};
+  ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
+    var m = roles[role] && roles[role].model;
+    if (m && !ids.includes(m)) ids.push(m);
   });
-  if (current && !hasModel(current)) {
-    select.prepend(el("option", { value: current, textContent: current + " (no está en el catálogo)", selected: true }));
-  }
-  return select;
+  var agents = (state.subagents && state.subagents.agents) || {};
+  Object.keys(agents).forEach(function (type) {
+    var m = agents[type] && agents[type].model;
+    if (m && !ids.includes(m)) ids.push(m);
+  });
+  return ids;
+}
+
+/**
+ * Disparador compacto del selector de modelo: en vez de un <select> con
+ * cientos de opciones, un botón con el modelo actual que abre un modal
+ * buscador (openModelPicker, modo único). El título muestra el ID completo.
+ */
+function modelSelect(current, onChange) {
+  var model = current ? findModel(current) : null;
+  var text = !current ? "(sin fijar)"
+    : model ? model.label + "  ·  " + vendorOf(model)
+    : current + "  ·  (no está en el catálogo)";
+  return el("button", {
+    type: "button",
+    className: "mpk" + (current ? "" : " mpk-empty"),
+    title: current ? current : "Elegir un modelo",
+    attrs: { "aria-haspopup": "dialog" },
+    onclick: function () {
+      openModelPicker({
+        title: "Elegir modelo",
+        single: true,
+        current: current,
+        getList: function () { return [current]; },
+        onPick: function (id) { onChange(id); }
+      });
+    }
+  }, [
+    el("span", { className: "mpk-label", textContent: text }),
+    el("span", { className: "mpk-caret", textContent: "▾", attrs: { "aria-hidden": "true" } })
+  ]);
 }
 
 function selectFrom(values, current, onChange) {
@@ -1379,87 +1459,178 @@ function selectFrom(values, current, onChange) {
   return select;
 }
 
-// --- fallback picker ---------------------------------------------------------
+// --- model picker ------------------------------------------------------------
 
 /**
- * Modal para elegir modelos de fallback: catálogo completo agrupado por
- * proveedor (sin buscador). Un clic añade el modelo; clic en uno ya añadido
- * lo quita (aria-pressed). Se cierra con ✕, pulsando el fondo o ESC, y
- * devuelve el foco al disparador. Trampa de foco con Tab.
+ * Modal de elección de modelos con buscador, agrupado por proveedor y con el
+ * grupo «Mis fijados» delante (los modelos ya fijados en la config). Dos modos:
+ *  - múltiple (fallbacks): getList/onAdd/onRemove; un clic añade, otro quita.
+ *  - único (fijar modelo): single + onPick; un clic elige, marca ✓ y cierra.
+ * El buscador filtra por nombre, ID exacto, fabricante y proveedor. Se cierra
+ * con ✕, fondo o ESC, y devuelve el foco al disparador. Trampa de foco con Tab.
  */
-function openFallbackPicker(titleText, getList, onAdd, onRemove) {
+function openModelPicker(opts) {
+  var single = !!opts.single;
+  var getList = opts.getList || function () { return []; };
   var rows = [];
+  var groups = [];
   var lastFocus = null;
   try { lastFocus = document.activeElement; } catch (_) {}
-  var refresh = function () {
-    var cur = getList();
-    rows.forEach(function (r) {
-      var on = cur.includes(r.id);
-      r.mark.textContent = on ? "✓" : "";
-      r.row.className = "fb-opt" + (on ? " fb-on" : "");
-      r.row.setAttribute("aria-pressed", on ? "true" : "false");
-      r.row.title = on ? "Quitar " + r.id + " del fallback" : "Añadir " + r.id + " al fallback";
-    });
+
+  var onKey = function (event) {
+    if (event.key === "Escape") { detach(); return; }
+    if (event.key !== "Tab") return;
+    var f = modal.querySelectorAll("button, input");
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
   var detach = function () {
     try { document.removeEventListener("keydown", onKey); } catch (_) {}
     try { if (back.parentNode) back.parentNode.removeChild(back); } catch (_) { back.style.display = "none"; }
     try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (_) {}
   };
-  var onKey = function (event) {
-    if (event.key === "Escape") { detach(); return; }
-    if (event.key !== "Tab") return;
-    var f = modal.querySelectorAll("button");
-    if (!f.length) return;
-    var first = f[0], last = f[f.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  };
 
   var back = el("div", { className: "fb-backdrop", onclick: function (event) { if (event.target === back) detach(); } });
   var modal = el("div", {
     className: "fb-modal",
-    attrs: { role: "dialog", "aria-modal": "true", "aria-label": titleText }
+    attrs: { role: "dialog", "aria-modal": "true", "aria-label": opts.title }
   });
-  var head = el("div", { className: "fb-modal-head" }, [
-    el("strong", { className: "fb-modal-title", textContent: titleText }),
+  modal.append(el("div", { className: "fb-modal-head" }, [
+    el("strong", { className: "fb-modal-title", textContent: opts.title }),
     el("button", { type: "button", className: "fb-modal-close", textContent: "✕", title: "Cerrar", attrs: { "aria-label": "Cerrar catálogo" }, onclick: detach })
-  ]);
-  modal.append(head);
-  catalog.forEach(function (group) {
-    modal.append(el("div", { className: "fb-group", textContent: group.label + (group.id === "copilot" ? "" : " (clave propia)") }));
-    group.models.forEach(function (model) {
-      var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
-      var mark = el("span", { className: "fb-mark", textContent: "" });
-      var row = el("button", {
-        type: "button",
-        className: "fb-opt",
-        attrs: { "aria-pressed": "false" },
-        onclick: function () {
-          var cur = getList();
-          if (cur.includes(model.id)) { if (onRemove) onRemove(model.id); }
-          else { onAdd(model.id); }
-          refresh();
-        }
-      }, [
-        el("span", { className: "fb-opt-name", textContent: model.label }),
-        el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
-        mark
-      ]);
-      rows.push({ id: model.id, mark: mark, row: row });
-      modal.append(row);
-    });
+  ]));
+  var count = el("span", { className: "fb-count" });
+  var search = el("input", {
+    type: "text",
+    placeholder: "Buscar por nombre, ID o fabricante…",
+    attrs: { "aria-label": "Buscar modelos" }
   });
-  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: "No hay modelos en el catálogo. Recarga con el botón «Refrescar»." }));
+  modal.append(el("div", { className: "fb-search" }, [search, count]));
+
+  var refreshMarks = function () {
+    var cur = getList();
+    rows.forEach(function (r) {
+      var on = cur.includes(r.id);
+      r.mark.textContent = on ? "✓" : "";
+      if (on) r.row.classList.add("fb-on"); else r.row.classList.remove("fb-on");
+      if (!single) {
+        r.row.setAttribute("aria-pressed", on ? "true" : "false");
+        r.row.title = on ? "Quitar " + r.id + " del fallback" : "Añadir " + r.id + " al fallback";
+      }
+    });
+  };
+
+  var addGroup = function (titleText) {
+    var g = el("div", { className: "fb-group", textContent: titleText });
+    g._rows = [];
+    g._hay = titleText.toLowerCase();
+    modal.append(g);
+    groups.push(g);
+    return g;
+  };
+  var addRow = function (model, g) {
+    // El meta muestra fabricante y TIER de coste (no esfuerzo), nunca el
+    // ID abreviado: va en su propia línea mono para poder verificarlo.
+    var cost = model.tier === "byok" ? "coste externo" : "coste " + (TIER_LABEL[model.tier] || "?");
+    var mark = el("span", { className: "fb-mark", textContent: "" });
+    var row = el("button", {
+      type: "button",
+      className: "fb-opt",
+      title: model.id,
+      attrs: single ? {} : { "aria-pressed": "false" },
+      onclick: function () {
+        if (single) { opts.onPick(model.id); detach(); return; }
+        if (getList().includes(model.id)) { if (opts.onRemove) opts.onRemove(model.id); }
+        else { opts.onAdd(model.id); }
+        refreshMarks();
+      }
+    }, [
+      el("span", { className: "fb-opt-main" }, [
+        el("span", { className: "fb-opt-name", textContent: model.label }),
+        el("span", { className: "fb-opt-id mono", textContent: model.id })
+      ]),
+      el("span", { className: "fb-opt-meta", textContent: vendorOf(model) + "  ·  " + cost }),
+      mark
+    ]);
+    var entry = {
+      id: model.id, row: row, mark: mark, group: g,
+      hay: (model.label + " " + model.id + " " + vendorOf(model) + " " + g._hay).toLowerCase()
+    };
+    rows.push(entry);
+    g._rows.push(entry);
+    modal.append(row);
+  };
+
+  var pinnedIds = modelPickedIds();
+  var byId = {};
+  allModels().forEach(function (m) { byId[m.id] = m; });
+  var inPinned = {};
+  if (pinnedIds.length) {
+    var pg = addGroup("Mis fijados");
+    pinnedIds.forEach(function (id) {
+      var m = byId[id];
+      if (!m) return;
+      inPinned[id] = true;
+      addRow(m, pg);
+    });
+    if (!pg._rows.length) modal.removeChild(pg);
+  }
+  catalog.forEach(function (group) {
+    var g = addGroup(group.label + (group.id === "copilot" ? "" : " (clave propia)"));
+    group.models.forEach(function (model) {
+      if (inPinned[model.id]) return;
+      addRow(model, g);
+    });
+    if (!g._rows.length) modal.removeChild(g);
+  });
+  groups = groups.filter(function (g) { return g.parentNode; });
+  if (!rows.length) modal.append(el("div", { className: "fb-empty", textContent: "No hay modelos en el catálogo. Recarga con el botón «Actualizar modelos»." }));
+
+  var applyFilter = function () {
+    var q = search.value.trim().toLowerCase();
+    var shown = 0;
+    rows.forEach(function (r) {
+      var hit = !q || r.hay.includes(q);
+      if (hit) r.row.classList.remove("fb-hide"); else r.row.classList.add("fb-hide");
+      if (hit) shown++;
+    });
+    groups.forEach(function (g) {
+      var any = g._rows.some(function (r) { return r.hay.includes(q); });
+      if (any) g.classList.remove("fb-hide"); else g.classList.add("fb-hide");
+    });
+    count.textContent = rows.length
+      ? (shown === rows.length ? rows.length + (rows.length === 1 ? " modelo" : " modelos") : shown + " de " + rows.length)
+      : "";
+  };
+  search.oninput = applyFilter;
+
+  if (single && opts.current) {
+    modal.append(el("div", { className: "fb-foot" }, [
+      el("button", {
+        type: "button", className: "toggle",
+        textContent: "Quitar el fijado (dejar sin modelo)",
+        onclick: function () { opts.onPick(""); detach(); }
+      })
+    ]));
+  }
+
   back.append(modal);
   document.body.append(back);
   try { document.addEventListener("keydown", onKey); } catch (_) {}
-  refresh();
+  refreshMarks();
+  applyFilter();
   try {
-    var focusTarget = modal.querySelector(".fb-opt") || modal.querySelector(".fb-modal-close");
-    if (focusTarget && focusTarget.focus) focusTarget.focus();
+    if (rows.length) { search.focus(); }
+    else { var t = modal.querySelector(".fb-modal-close"); if (t) t.focus(); }
   } catch (_) {}
   return detach;
+}
+
+/** Compat: apertura del picker en modo múltiple para cadenas de fallback. */
+function openFallbackPicker(titleText, getList, onAdd, onRemove) {
+  return openModelPicker({ title: titleText, getList: getList, onAdd: onAdd, onRemove: onRemove });
 }
 
 /**
@@ -1641,10 +1812,10 @@ function defs(hostId, entries) {
 
 function renderRoutingDefs() {
   defs("routingDefs", [
-    ["Modelo", "Qué modelo atiende ese papel. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
+    ["Modelo", "Qué modelo atiende ese papel. El botón abre un buscador sobre el catálogo: escribe nombre, ID o fabricante, y el grupo «Mis fijados» coloca delante los modelos que ya usas en otra fila. Los del plan de Copilot consumen tu cuota; los de clave propia se facturan aparte."],
     ["Esfuerzo (effort)", "Cuánto tiempo de cómputo dedica el modelo a pensar antes de responder. Subirlo mejora los problemas difíciles y encarece cada llamada; bajarlo responde antes y gasta menos. El desplegable solo ofrece los niveles que admite el modelo elegido; si cambias de modelo y el nivel guardado ya no es válido, se deja sin definir. Niveles globales: " +
       effortLevels.join(" · ") + "."],
-    ["Fallback", "Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo (agrupado por proveedor): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden."],
+    ["Fallback", "Lista de modelos secundarios, en orden de intento. Pulsa «+ añadir» para abrir el catálogo con buscador (agrupado por proveedor, con «Mis fijados» delante): un clic añade el modelo al final de la cadena y una ✓ marca los que ya están; ✕, ESC o pulsar el fondo cierran el modal. En los chips, las flechas ↑↓ cambian el orden y ✕ lo quita. Si el modelo principal no está disponible, el runtime intenta los de esta lista en orden."],
     ["Exigencia (modelPolicy) — required", "El modelo fijado es obligatorio. Si alguien pide otro modelo para ese subagente, se rechaza. Es lo que impide que una llamada suelta escale a un modelo premium."],
     ["Exigencia (modelPolicy) — preferred", "El modelo fijado es solo la opción por defecto: una petición explícita de otro modelo gana. Úsalo cuando quieras una sugerencia, no una regla."],
     ["Exigencia (modelPolicy) — inherit", "Sin opinión propia: se aplica lo que tenga configurado el runtime. Es el valor que se escribe cuando eliges esta opción."],
@@ -1659,11 +1830,11 @@ function renderCatalog() {
   var table = clear("catalogTable");
   var head = el("thead");
   head.append(el("tr", null, [
-    el("th", { textContent: "Model" }),
-    el("th", { textContent: "Exact runtime ID" }),
-    el("th", { textContent: "Provider label / runtime ID" }),
+    el("th", { textContent: "Modelo" }),
+    el("th", { textContent: "ID exacto de runtime" }),
+    el("th", { textContent: "Proveedor / ID runtime" }),
     el("th", { textContent: "Fabricante" }),
-    el("th", { textContent: "Vendor metadata source", className: "tiny" }),
+    el("th", { textContent: "Origen del dato", className: "tiny" }),
     el("th", { textContent: "Precio" }),
     el("th", { textContent: "Contexto" }),
     el("th", { textContent: "Global", className: "num" })
@@ -1673,7 +1844,7 @@ function renderCatalog() {
   var body = el("tbody");
   catalog.forEach(function (group) {
     body.append(el("tr", null, [
-      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + " models" })
+      el("td", { colSpan: 8, className: "small muted", textContent: group.label + " (" + group.id + ") — " + group.models.length + " modelos" })
     ]));
     group.models.forEach(function (model) {
       var origin = model.vendorSource === "runtime" ? "runtime"
@@ -1701,29 +1872,29 @@ function renderCatalog() {
   var external = allModels().filter(function (model) { return model.external; }).length;
   var sourceIsLive = catalogSnapshot.source === "live";
   document.getElementById("catalogSub").textContent = sourceIsLive
-    ? allModels().length + " models across " + catalog.length + " providers (" + external +
-      " provider-qualified IDs) reported by this session runtime. Listing is not a credential or inference test."
-    : "The live session model list is unavailable; the fallback catalog is shown and cannot confirm model availability.";
+    ? allModels().length + " modelos en " + catalog.length + " proveedores (" + external +
+      " IDs cualificados por proveedor) reportados por el runtime de esta sesión. Que aparezcan aquí no verifica credenciales ni inferencia."
+    : "No hay lista de modelos en vivo; se muestra el catálogo de respaldo, que no puede confirmar disponibilidad.";
 
   var withVendor = allModels().filter(function (model) { return model.vendor; }).length;
   document.getElementById("catalogMeta").textContent =
-    "Vendor metadata identified for " + withVendor + " of " + allModels().length + " models. " +
-    "This metadata comes from the runtime or public snapshot and does not indicate provider registration or callability.";
+    "Dato de fabricante identificado para " + withVendor + " de " + allModels().length + " modelos. " +
+    "Proviene del runtime o de la instantánea pública; no implica registro en proveedor ni que la llamada vaya a funcionar.";
 }
 
 function renderCatalogDiagnostics() {
   var host = clear("catalogDiagnostics");
   var live = catalogSnapshot.source === "live";
   var knownIds = new Set(allModels().map(function (model) { return model.id; }));
-  var rows = [["Stage / subagent", "Configured model ID", "Model policy", "Session runtime status"]];
+  var rows = [["Etapa / subagente", "ID de modelo configurado", "Exigencia", "Estado en el runtime"]];
   var statusFor = function (model) {
-    return !live ? "Unknown — fallback catalog"
-      : knownIds.has(model) ? "Listed by live runtime"
-      : "Not exposed by this session";
+    return !live ? "Desconocido — catálogo de respaldo"
+      : knownIds.has(model) ? "Listado por el runtime en vivo"
+      : "No lo expone esta sesión";
   };
   ["orchestrate", "plan", "execute", "verify"].forEach(function (role) {
     var model = state.roles && state.roles[role] && state.roles[role].model || "";
-    rows.push([role, model || "(not configured)", "—", statusFor(model)]);
+    rows.push([role, model || "(sin configurar)", "—", statusFor(model)]);
   });
   // A subagent pin is the one enforced with modelPolicy=required, so an id the
   // runtime cannot resolve silently routes elsewhere; the rows make that visible.
@@ -1731,23 +1902,23 @@ function renderCatalogDiagnostics() {
   Object.keys(pinnedAgents).forEach(function (type) {
     var entry = pinnedAgents[type] || {};
     if (!entry.model) return;
-    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || "(default)", statusFor(entry.model)]);
+    rows.push(["subagent:" + type, entry.model, entry.modelPolicy || "(predeterminada)", statusFor(entry.model)]);
   });
   var sourceText = live
-    ? "Source: session.rpc.model.list() — live session runtime"
-    : "Source: fallback catalog — live availability could not be confirmed";
+    ? "Fuente: session.rpc.model.list() — runtime de la sesión en vivo"
+    : "Fuente: catálogo de respaldo — no se pudo confirmar disponibilidad en vivo";
   var checkedText = catalogDiagnostics.fetchedAt
-    ? "Last checked: " + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
-    : "Last checked: unknown";
+    ? "Última comprobación: " + new Date(catalogDiagnostics.fetchedAt).toLocaleString()
+    : "Última comprobación: desconocida";
   host.append(el("p", { className: "note", textContent: sourceText + ". " + checkedText +
-    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + " model(s) across " +
-    (catalogDiagnostics.providers || []).length + " provider(s)." }));
+    ". " + (catalogDiagnostics.modelCount ?? allModels().length) + " modelos en " +
+    (catalogDiagnostics.providers || []).length + " proveedores." }));
   if (!live) {
     host.append(el("p", { className: "note", textContent:
-      catalogSnapshot.diagnostic || "The live model-list request failed or returned no models; see the extension log for details. The fallback catalog is display-only and cannot confirm availability." }));
+      catalogSnapshot.diagnostic || "La petición de modelos en vivo falló o no devolvió modelos; consulta el registro de la extensión para más detalle. El catálogo de respaldo es solo informativo y no puede confirmar disponibilidad." }));
   }
   host.append(el("p", { className: "note", textContent:
-    "“Listed by live runtime” means the current session reports the exact ID; it does not verify provider credentials or a successful inference request. “Not exposed” does not mean the model is absent from app settings or a provider registry." }));
+    "«Listado por el runtime en vivo» significa que la sesión actual reporta ese ID exacto; no verifica credenciales del proveedor ni una petición de inferencia con éxito. «No lo expone esta sesión» no significa que el modelo falte en los ajustes de la app ni en el registro de un proveedor." }));
   var table = el("table");
   var head = el("thead");
   head.append(el("tr", null, rows[0].map(function (text) { return el("th", { textContent: text }); })));
@@ -1857,8 +2028,8 @@ function renderCatalogDiagnostics() {
 
   function renderCatalogDefs() {
   defs("catalogDefs", [
-    ["Session runtime status", "Only an exact model ID present in a successful live session model list is marked as listed. This is not a credential, endpoint, or inference test."],
-    ["Fallback catalog", "A display-only list used when the session model list is unavailable. It never confirms a configured workflow model is available."],
+    ["Estado en el runtime", "Solo se marca como listado un ID de modelo exacto presente en una lista de modelos en vivo de la sesión con éxito. No es una prueba de credenciales, endpoint ni inferencia."],
+    ["Catálogo de respaldo", "Lista solo informativa que se usa cuando la lista de modelos de la sesión no está disponible. Nunca confirma que un modelo del flujo de trabajo esté disponible."],
     ["Proveedor", "Quién sirve el modelo. GitHub Copilot, o el proveedor externo cuya clave tengas configurada."],
     ["Fabricante", "Quién lo construyó. Se muestra aparte del proveedor porque un mismo fabricante puede llegar por varias vías."],
     ["Origen del dato", "De dónde ha salido el fabricante: del runtime, de la instantánea pública, de la familia del modelo o de una heurística sobre el identificador."],
@@ -2850,10 +3021,10 @@ function wireSceneButtons() {
 
 function renderGuide() {
   defs("guideDefs", [
-    ["Routing", "Choose models for the four workflow stages (orchestrate, plan, execute, verify) and for the subagents launched by the main agent. Orchestrate prepares decomposition and targets; Plan details implementation; only Execute implements changes."],
+    ["Enrutado (Routing)", "Elige modelos para las cuatro etapas del flujo de trabajo (orchestrate, plan, execute, verify) y para los subagentes que lanza el agente principal. Orchestrate prepara la descomposición y los objetivos; Plan detalla la implementación; solo Execute implementa cambios."],
     ["Exigencia (modelPolicy)", "Decide si el modelo fijado es obligatorio (required), una simple sugerencia (preferred) o si no opinas (inherit). Es lo que evita que una llamada suelta se vaya a un modelo caro sin que te enteres."],
     ["Esfuerzo (effort)", "Cuánto piensa el modelo antes de contestar. Más esfuerzo resuelve mejor lo difícil y cuesta más por llamada; menos esfuerzo responde antes y gasta menos."],
-    ["Catalog", "The model IDs reported by this session's model-list RPC. This list does not inspect provider settings or credentials and does not guarantee inference will succeed. It includes vendor, price category, context, and public benchmark score when available."],
+    ["Catálogo", "Los IDs de modelo que reporta el RPC de lista de modelos de esta sesión. Esta lista no inspecciona ajustes ni credenciales del proveedor y no garantiza que la inferencia vaya a funcionar. Incluye fabricante, categoría de precio, contexto y nota de benchmarks públicos cuando están disponibles."],
     ["Comparativa", "La parte educativa: para cada tipo de tarea te dice qué modelo sale mejor y por qué, con las notas públicas de benchmarks y el precio al lado."],
     ["Benchmark", "Una prueba estandarizada con la que se mide a los modelos. Ninguno gana en todo: hay quien escribe mejor código y quien razona mejor. Por eso la recomendación cambia según la tarea."],
     ["Fabricante frente a proveedor", "El proveedor es quien te sirve el modelo (GitHub Copilot o tu proveedor externo). El fabricante es quien lo construyó (Anthropic, OpenAI, Alibaba…). Un mismo fabricante puede llegarte por las dos vías."],
@@ -3267,7 +3438,7 @@ async function refreshData() {
 
 async function refreshCatalog() {
   var status = document.getElementById("catalogRefreshStatus");
-  status.textContent = "Refreshing session model list…";
+  status.textContent = "Actualizando la lista de modelos de la sesión…";
   status.dataset.tone = "";
   try {
     var response = await fetch("/catalog?refresh=1");
@@ -3277,12 +3448,12 @@ async function refreshCatalog() {
     catalogDiagnostics = payload.diagnostics || {};
     catalog = catalogGroups(catalogSnapshot);
     status.textContent = catalogSnapshot.source === "live"
-      ? "Session model list refreshed."
-      : "Refresh completed, but only the fallback catalog is available.";
+      ? "Lista de modelos actualizada."
+      : "Actualización terminada, pero solo hay disponible el catálogo de respaldo.";
     status.dataset.tone = catalogSnapshot.source === "live" ? "ok" : "warn";
     renderAll();
   } catch (error) {
-    status.textContent = "Could not refresh model list: " + error.message;
+    status.textContent = "No se pudo actualizar la lista de modelos: " + error.message;
     status.dataset.tone = "err";
   }
 }

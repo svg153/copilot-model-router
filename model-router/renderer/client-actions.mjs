@@ -376,7 +376,7 @@ async function refreshData() {
 
 async function refreshCatalog() {
   var status = document.getElementById("catalogRefreshStatus");
-  status.textContent = "Refreshing session model list…";
+  status.textContent = "Actualizando la lista de modelos de la sesión…";
   status.dataset.tone = "";
   try {
     var response = await fetch("/catalog?refresh=1");
@@ -386,12 +386,12 @@ async function refreshCatalog() {
     catalogDiagnostics = payload.diagnostics || {};
     catalog = catalogGroups(catalogSnapshot);
     status.textContent = catalogSnapshot.source === "live"
-      ? "Session model list refreshed."
-      : "Refresh completed, but only the fallback catalog is available.";
+      ? "Lista de modelos actualizada."
+      : "Actualización terminada, pero solo hay disponible el catálogo de respaldo.";
     status.dataset.tone = catalogSnapshot.source === "live" ? "ok" : "warn";
     renderAll();
   } catch (error) {
-    status.textContent = "Could not refresh model list: " + error.message;
+    status.textContent = "No se pudo actualizar la lista de modelos: " + error.message;
     status.dataset.tone = "err";
   }
 }
