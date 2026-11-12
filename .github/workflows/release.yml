@@ -53,7 +53,9 @@ jobs:
             git reset --hard origin/main
             node scripts/build-data.mjs --verify
             node --test model-router/test/*.test.mjs
-            NEXT=$(node scripts/release-version.mjs "$(node -p "require('./package.json').version")")
+            # export is load-bearing: the node -e bump below reads process.env.NEXT;
+            # a plain shell assignment would serialize package.json without a version field.
+            export NEXT=$(node scripts/release-version.mjs "$(node -p "require('./package.json').version")")
             node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.NEXT;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
             git add package.json
             git commit -m "chore(release): v${NEXT} [skip ci]"
